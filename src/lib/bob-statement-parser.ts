@@ -299,7 +299,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
             },
           });
           await ocrWorker.setParameters({
-            tessedit_pageseg_mode: '11',
+            tessedit_pageseg_mode: '11' as import('tesseract.js').PSM,
             preserve_interword_spaces: '1',
             user_defined_dpi: '300',
           });
