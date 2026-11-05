@@ -108,7 +108,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
       dateText(tx.date),
       tx.valueDate ? dateText(tx.valueDate) : dateText(tx.date),
       tx.description || '',
-      tx.chequeNumber || tx.referenceNumber || '',
+      tx.chequeNumber || tx.instrumentNumber || tx.referenceNumber || '',
       tx.type === 'debit' ? money(tx.amount) : '',
       tx.type === 'credit' ? money(tx.amount) : '',
       money(runningBalance),
@@ -143,6 +143,9 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
     ['Account Holder', account.name || '', 'Account Number', account.accountNumber || ''],
     ['Account Type', account.accountTypeName || account.accountType || '', 'IFSC Code', account.ifscCode || ''],
     ['Branch Name', account.branchName || '', 'MICR Code', account.micrCode || ''],
+    ['Customer ID', account.customerId || '', 'CKYC Number', account.ckycNumber || ''],
+    ['Nominee', account.nominee || '', 'Customer City', account.customerCity || ''],
+    ['Branch City', account.branchCity || '', 'Branch PIN', account.branchPin || ''],
   ];
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
