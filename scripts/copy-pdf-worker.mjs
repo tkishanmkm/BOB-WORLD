@@ -19,14 +19,12 @@ await copy(
 );
 
 const coreFiles = [
+  // Tesseract.js browser core variants are self-contained wasm.js bundles.
+  // Keep all four so older WebViews can select a compatible core.
   'tesseract-core.wasm.js',
-  'tesseract-core.wasm',
   'tesseract-core-simd.wasm.js',
-  'tesseract-core-simd.wasm',
   'tesseract-core-lstm.wasm.js',
-  'tesseract-core-lstm.wasm',
   'tesseract-core-simd-lstm.wasm.js',
-  'tesseract-core-simd-lstm.wasm',
 ];
 for (const name of coreFiles) {
   await copy(resolve(coreRoot, name), resolve(publicOcr, 'core', name));
