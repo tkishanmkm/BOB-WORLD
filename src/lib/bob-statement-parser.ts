@@ -82,8 +82,8 @@ function parseDate(value: string): string | null {
 
 function parseMoney(value: string): number | null {
   let raw = value.trim()
-    .replace(/^(?:INR|Rs\\.?|₹)\\s*/i, '')
-    .replace(/\\s+/g, '')
+    .replace(/^(?:INR|Rs\.?|₹)\s*/i, '')
+    .replace(/\s+/g, '')
     .replace(/(?:CR|DR)$/i, '');
   let negative = false;
   if (raw.startsWith('(') && raw.endsWith(')')) {
@@ -94,19 +94,19 @@ function parseMoney(value: string): number | null {
     negative = true;
     raw = raw.slice(1);
   }
-  if (!raw || !/^[\\d,.]+$/.test(raw)) return null;
+  if (!raw || !/^[\d,.]+$/.test(raw)) return null;
   const lastSeparator = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
   let normalized: string;
   if (lastSeparator >= 0) {
-    const integerDigits = raw.slice(0, lastSeparator).replace(/\\D/g, '');
-    const decimalDigits = raw.slice(lastSeparator + 1).replace(/\\D/g, '');
+    const integerDigits = raw.slice(0, lastSeparator).replace(/\D/g, '');
+    const decimalDigits = raw.slice(lastSeparator + 1).replace(/\D/g, '');
     if (decimalDigits.length === 1 || decimalDigits.length === 2) {
       normalized = (integerDigits || '0') + '.' + decimalDigits.padEnd(2, '0');
     } else {
-      normalized = raw.replace(/\\D/g, '');
+      normalized = raw.replace(/\D/g, '');
     }
   } else {
-    normalized = raw.replace(/\\D/g, '');
+    normalized = raw.replace(/\D/g, '');
   }
   if (!normalized) return null;
   const parsed = Number(normalized);
@@ -469,7 +469,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     const accountDetails: Partial<AccountDetailsType> = {
       name: fieldFromText(leftText, ['Account Name', 'Account Holder Name', 'Customer Name']),
       accountNumber,
-      ifscCode: fieldFromText(rightText, ['IFSC Code', 'IFSC']),
+      ifscCode: (() => { const code = fieldFromText(rightText, ['IFSC Code', 'IFSC']).replace(/\s/g, '').toUpperCase(); return /^[A-Z]{4}O[A-Z0-9]{6}$/.test(code) ? code.replace(/^(.{4})O/, '$10') : code; })(),
       branchName,
       branchAddress,
       customerAddress,
