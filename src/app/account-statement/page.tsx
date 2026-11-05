@@ -19,7 +19,7 @@ import {
   STATEMENT_BANK_LOGO_KEY,
 } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { generateBobStatementPdf } from '@/lib/bob-statement-pdf';
 
@@ -126,19 +126,15 @@ export default function AccountStatementPage() {
       if (Capacitor.isNativePlatform()) {
         const dataUrl = await readBlobAsDataUrl(pdfBlob);
         const base64 = dataUrl.split(',')[1];
-        const directory = Capacitor.getPlatform() === 'android' ? Directory.Downloads : Directory.Documents;
         await Filesystem.writeFile({
           path: fileName,
           data: base64,
-          directory,
-          encoding: Encoding.Base64,
+          directory: Directory.Documents,
           recursive: true,
         });
         toast({
           title: 'Statement saved',
-          description: Capacitor.getPlatform() === 'android'
-            ? fileName + ' saved to the Downloads folder.'
-            : fileName + ' saved to the app Documents folder.',
+          description: fileName + ' saved to the Documents folder.',
         });
       } else {
         const url = URL.createObjectURL(pdfBlob);
