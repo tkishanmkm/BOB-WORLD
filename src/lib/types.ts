@@ -10,6 +10,7 @@ export interface AccountDetailsType {
   panNumber?: string;
   branchName?: string;
   customerAddress?: string;
+  customerCity?: string;
   customerPin?: string;
   branchAddress?: string;
   branchCity?: string;
