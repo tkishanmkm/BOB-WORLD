@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import type { TransactionType, PayeeType, AccountDetailsType } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
-import { FileDown, Landmark } from 'lucide-react';
+import { FileDown } from 'lucide-react';
 import { useState } from 'react';
 import jsPDF from 'jspdf';
 import { STATEMENT_LOGO_KEY } from '@/lib/constants';
@@ -88,6 +88,26 @@ function toPdfImageType(dataUri: string): 'PNG' | 'JPEG' | null {
 const bankIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96"><path fill="#5f6874" d="M12 2 2 7v2h20V7L12 2Zm-7 9h2v7H5v-7Zm6 0h2v7h-2v-7Zm6 0h2v7h-2v-7ZM3 20h18v2H3v-2Z"/></svg>';
 const rupeeIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" width="320" height="512"><path fill="#23282e" d="M32 32h256c17.7 0 32 14.3 32 32s-14.3 32-32 32h-56c13.4 13.8 22.8 31.9 26.5 52H288c17.7 0 32 14.3 32 32s-14.3 32-32 32h-29.5c-13.1 58.7-62.5 103-122.7 108.4l145.1 104.8c14.4 10.4 17.7 30.4 7.3 44.7-10.4 14.4-30.4 17.7-44.7 7.3l-224-162c-11.4-8.2-16.2-22.8-11.9-36.2C12 265.6 24.6 256 39 256h73c33.4 0 62.2-18.6 77.1-46H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h157.1c-14.9-27.4-43.7-46-77.1-46H32C14.3 100 0 85.7 0 68s14.3-36 32-36Z"/></svg>';
 
+async function svgToPngDataUrl(svg: string, width: number, height: number): Promise<string> {
+  const image = new window.Image();
+  const source = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('Could not render a receipt icon.'));
+    image.src = source;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas is unavailable for receipt icon rendering.');
+  context.drawImage(image, 0, 0, width, height);
+  const result = canvas.toDataURL('image/png');
+  canvas.width = 0;
+  canvas.height = 0;
+  return result;
+}
+
 export function TransactionReceiptDialog({
   open,
   onOpenChange,
@@ -107,7 +127,7 @@ export function TransactionReceiptDialog({
     maximumFractionDigits: 2,
   });
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     setDownloadError(null);
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -207,11 +227,11 @@ export function TransactionReceiptDialog({
       doc.text('Payee account number', margin, y);
       const payeeNumber = String(payee.accountNumber || '-');
       const payeeWidth = doc.getTextWidth(payeeNumber);
-      const iconData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(bankIconSvg);
       try {
-        doc.addImage(iconData, 'SVG', right - payeeWidth - 7, y - 3.1, 4.2, 4.2, undefined, 'FAST');
-      } catch {
-        doc.setFont('helvetica', 'normal');
+        const iconData = await svgToPngDataUrl(bankIconSvg, 96, 96);
+        doc.addImage(iconData, 'PNG', right - payeeWidth - 7, y - 3.1, 4.2, 4.2, undefined, 'FAST');
+      } catch (iconError) {
+        console.warn('Beneficiary bank icon could not be embedded:', iconError);
       }
       doc.setTextColor(35, 40, 46);
       doc.text(payeeNumber, right, y, { align: 'right' });
@@ -233,11 +253,11 @@ export function TransactionReceiptDialog({
       doc.setFontSize(12);
       doc.setTextColor(35, 40, 46);
       const amountWidth = doc.getTextWidth(amountText);
-      const rupeeData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(rupeeIconSvg);
       try {
-        doc.addImage(rupeeData, 'SVG', right - amountWidth - 6, y - 3.4, 3.5, 5, undefined, 'FAST');
-      } catch {
-        doc.setFont('helvetica', 'normal');
+        const rupeeData = await svgToPngDataUrl(rupeeIconSvg, 320, 512);
+        doc.addImage(rupeeData, 'PNG', right - amountWidth - 6, y - 3.4, 3.5, 5, undefined, 'FAST');
+      } catch (iconError) {
+        console.warn('Rupee amount icon could not be embedded:', iconError);
       }
       doc.text(amountText, right, y, { align: 'right' });
       y += 7;
