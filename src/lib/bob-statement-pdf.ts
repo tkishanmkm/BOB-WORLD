@@ -129,7 +129,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
   doc.text('Statement period: ' + dateText(from) + ' to ' + dateText(to), pageWidth / 2, 35, { align: 'center' });
 
   doc.setFillColor(246, 247, 249);
-  doc.roundedRect(margin, 40, contentWidth, 27, 1.5, 1.5, 'F');
+  doc.roundedRect(margin, 40, contentWidth, 42, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(35, 43, 54);
@@ -162,7 +162,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
     doc.setTextColor(90, 96, 103);
   });
 
-  let tableStartY = 71;
+  let tableStartY = 86;
   const addressLines: string[] = [];
   if (account.customerAddress) addressLines.push('Customer Address: ' + account.customerAddress + (account.customerPin ? ' - ' + account.customerPin : ''));
   if (account.branchAddress) addressLines.push('Branch Address: ' + account.branchAddress + (account.branchCity ? ', ' + account.branchCity : '') + (account.branchPin ? ' - ' + account.branchPin : ''));
