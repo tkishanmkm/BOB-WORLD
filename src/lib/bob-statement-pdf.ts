@@ -61,6 +61,11 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
   const margin = 8;
   const contentWidth = pageWidth - margin * 2;
 
+  const periodStart = new Date(from);
+  periodStart.setHours(0, 0, 0, 0);
+  const periodEnd = new Date(to);
+  periodEnd.setHours(23, 59, 59, 999);
+
   const allTransactions = [...transactions]
     .filter(tx => Number.isFinite(new Date(tx.date).getTime()) && Number.isFinite(tx.amount))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -74,7 +79,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
 
   for (const tx of allTransactions) {
     const txTime = new Date(tx.date).getTime();
-    if (txTime < from.getTime()) {
+    if (txTime < periodStart.getTime()) {
       if (typeof tx.balanceAfter === 'number' && Number.isFinite(tx.balanceAfter)) {
         runningBalance = tx.balanceAfter;
       } else {
@@ -86,7 +91,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
 
   const visibleTransactions = allTransactions.filter(tx => {
     const time = new Date(tx.date).getTime();
-    return time >= from.getTime() && time <= to.getTime();
+    return time >= periodStart.getTime() && time <= periodEnd.getTime();
   });
 
   const rows: (string | number)[][] = [[
