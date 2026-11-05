@@ -247,9 +247,9 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
             .filter((value): value is number => value !== null);
           return candidates.length ? candidates[0] : undefined;
         };
-        const debit = amountInColumn(0.64, 0.79);
-        const credit = amountInColumn(0.79, 0.91);
-        const balance = amountInColumn(0.91, 1.02);
+        const debit = amountInColumn(0.64, 0.77);
+        const credit = amountInColumn(0.77, 0.90);
+        const balance = amountInColumn(0.90, 1.02);
 
         if (/opening\s+balance|balance\s+brought\s+forward/i.test(description)) {
           if (balance !== undefined) openingBalance = balance;
