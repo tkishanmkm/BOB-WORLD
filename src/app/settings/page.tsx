@@ -683,6 +683,23 @@ export default function SettingsPage() {
         reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the statement PDF.'));
         reader.readAsDataURL(file);
       });
+      // Keep the original source PDF even when the file is scanned and cannot
+      // be text-parsed. A parsing failure never replaces live account data.
+      localStorage.setItem(STATEMENT_PDF_KEY, pdfDataUri);
+      setStatementPdfName(file.name);
+      try {
+        const assets = await extractStatementBrandAssets(await file.arrayBuffer());
+        if (assets.bobWorldLogo) {
+          localStorage.setItem(STATEMENT_LOGO_KEY, assets.bobWorldLogo);
+          setImageStates(prev => ({ ...prev, statementLogo: { ...prev.statementLogo, dataUri: assets.bobWorldLogo!, preview: assets.bobWorldLogo! } }));
+        }
+        if (assets.bankLogo) {
+          localStorage.setItem(STATEMENT_BANK_LOGO_KEY, assets.bankLogo);
+          setImageStates(prev => ({ ...prev, statementBankLogo: { ...prev.statementBankLogo, dataUri: assets.bankLogo!, preview: assets.bankLogo! } }));
+        }
+      } catch (assetError) {
+        console.warn('Statement logo extraction failed:', assetError);
+      }
       const parsed = await parseBobStatementPdf(await file.arrayBuffer());
       const parsedDetails = Object.fromEntries(Object.entries(parsed.accountDetails).filter(([, value]) => value !== undefined && value !== null && value !== '')) as Partial<AccountDetailsType>;
       const nextAccountDetails: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS, ...accountDetails, ...parsedDetails, accountNumber: parsed.accountNumber };
@@ -690,11 +707,9 @@ export default function SettingsPage() {
       const nextBalance = parsed.closingBalance ?? ((parsed.openingBalance ?? balance) + netMovement);
       const newestFirst = [...parsed.transactions].sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
 
-      localStorage.setItem(STATEMENT_PDF_KEY, pdfDataUri);
       localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(nextAccountDetails));
       localStorage.setItem(BALANCE_STORAGE_KEY, String(nextBalance));
       localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(newestFirst));
-      setStatementPdfName(file.name);
       setAccountDetails(nextAccountDetails);
       setBalance(nextBalance);
       setTransactions(newestFirst);
