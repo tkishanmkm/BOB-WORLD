@@ -9,6 +9,18 @@ export interface AccountDetailsType {
   dob?: string; // Date of Birth
   panNumber?: string;
   branchName?: string;
+  customerAddress?: string;
+  customerPin?: string;
+  branchAddress?: string;
+  branchCity?: string;
+  branchPin?: string;
+  micrCode?: string;
+  nominee?: string;
+  ckycNumber?: string;
+  statementOpeningBalance?: number;
+  statementPeriodFrom?: string;
+  statementPeriodTo?: string;
+  statementNote?: string;
   email?: string;
   phoneNumber?: string;
   accountType?: string;
@@ -27,6 +39,9 @@ export interface TransactionType {
   comments?: string;
   payeeId?: string; // Link to PayeeType.id
   referenceNumber?: string;
+  valueDate?: string;
+  chequeNumber?: string;
+  balanceAfter?: number;
 }
 
 export interface PayeeType {
