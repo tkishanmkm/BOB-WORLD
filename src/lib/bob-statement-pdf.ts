@@ -123,7 +123,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
   const leftLabelX = margin + 3;
   const leftValueX = margin + 27;
   const rightLabelX = margin + 98;
-  const rightValueX = margin + 132;
+  const rightValueX = margin + 128;
   const detail = (label: string, value: string, labelX: number, valueX: number, y: number, width: number) => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
@@ -136,11 +136,11 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
   };
 
   detail('Account Name', account.name || '', leftLabelX, leftValueX, 21, 63);
-  detail('Branch Name', account.branchName || '', rightLabelX, rightValueX, 21, 58);
+  detail('Branch Name', account.branchName || '', rightLabelX, rightValueX, 21, 62);
   detail('Account Number', account.accountNumber || '', leftLabelX, leftValueX, 31, 63);
-  detail('IFSC Code', account.ifscCode || '', rightLabelX, rightValueX, 31, 58);
+  detail('IFSC Code', account.ifscCode || '', rightLabelX, rightValueX, 31, 62);
   detail('Account Type', account.accountTypeName || account.accountType || '', leftLabelX, leftValueX, 41, 63);
-  detail('MICR Code', account.micrCode || '', rightLabelX, rightValueX, 41, 58);
+  detail('MICR Code', account.micrCode || '', rightLabelX, rightValueX, 41, 62);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
@@ -161,8 +161,8 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
     account.branchCity,
     account.branchPin,
   ].filter(Boolean).join(', ');
-  doc.text(doc.splitTextToSize(customerAddress || '-', 84).slice(0, 3), leftValueX, 57);
-  doc.text(doc.splitTextToSize(branchAddress || '-', 77).slice(0, 3), rightValueX, 57);
+  doc.text(doc.splitTextToSize(customerAddress || '-', 67).slice(0, 3), leftValueX, 57);
+  doc.text(doc.splitTextToSize(branchAddress || '-', 62).slice(0, 3), rightValueX, 57);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.6);
