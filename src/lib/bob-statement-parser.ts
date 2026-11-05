@@ -94,17 +94,22 @@ function buildRows(items: TextCell[], tolerance = 2.2): TextRow[] {
 
 function fieldFromText(text: string, labels: string[]): string {
   const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const nextField = /^(?:account\s+(?:name|number|type)|branch\s+(?:name|address|city|pin)|customer\s+(?:name|id|address|city|pin)|ifsc(?:\s+code)?|micr(?:\s+code)?|ckyc(?:\s+number|\s+no)?|nominee(?:\s+name)?|statement\s+(?:of\s+account|period)|serial\s+no\.?|transaction\s+date|value\s+date|description|cheque\s+number|debit|credit|balance)\b/i;
+  const fieldBoundary = /(?:^|\s)(?:account\s+(?:name|number|no\.?|type)|branch\s+(?:name|address|city|pin)|customer\s+(?:name|id|address|city|pin)|ifsc(?:\s+code)?|micr(?:\s+code)?|ckyc(?:\s+number|\s+no)?|nominee(?:\s+name)?|statement\s+(?:of\s+account|period)|serial\s+no\.?|s\.?\s*no\.?|transaction\s+date|value\s+date|description|cheque\s+number|debit|credit|balance)\b/i;
   for (let i = 0; i < lines.length; i++) {
     for (const label of labels) {
       const escaped = label.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const match = lines[i].match(new RegExp('^' + escaped + '\\s*[:\\-]?\\s*(.*)$', 'i'));
+      const labelPattern = new RegExp('(?:^|\\s)' + escaped + '\\s*[:\\-]?\\s*', 'i');
+      const match = labelPattern.exec(lines[i]);
       if (!match) continue;
+      let inline = lines[i].slice(match.index + match[0].length);
+      const boundary = fieldBoundary.exec(inline);
+      if (boundary) inline = inline.slice(0, boundary.index);
       const values: string[] = [];
-      const inline = (match[1] || '').trim();
-      if (inline && !/^(?:details|information)$/i.test(inline)) values.push(inline);
-      for (let j = i + 1; j < Math.min(lines.length, i + 9); j++) {
-        if (nextField.test(lines[j]) || DATE_RE.test(lines[j])) break;
+      if (inline.trim() && !/^(?:details|information)$/i.test(inline.trim())) {
+        values.push(inline.trim());
+      }
+      for (let j = i + 1; j < Math.min(lines.length, i + 10); j++) {
+        if (fieldBoundary.test(lines[j]) || DATE_RE.test(lines[j])) break;
         if (/^(?:opening|closing)\s+balance$/i.test(lines[j])) break;
         values.push(lines[j]);
       }
@@ -114,6 +119,33 @@ function fieldFromText(text: string, labels: string[]): string {
   return '';
 }
 
+function parseHocrWords(
+  hocr: string,
+  imageWidth: number,
+  imageHeight: number,
+  pageWidth: number,
+  pageHeight: number,
+): TextCell[] {
+  const parsed = new DOMParser().parseFromString(hocr, 'text/html');
+  return Array.from(parsed.querySelectorAll('.ocrx_word')).flatMap(element => {
+    const text = (element.textContent || '').replace(/\s+/g, ' ').trim();
+    const title = element.getAttribute('title') || '';
+    const box = /bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i.exec(title);
+    if (!text || !box) return [];
+    const x1 = Number(box[1]);
+    const y1 = Number(box[2]);
+    const x2 = Number(box[3]);
+    const y2 = Number(box[4]);
+    if (![x1, y1, x2, y2].every(Number.isFinite) || x2 <= x1 || y2 <= y1) return [];
+    const centerX = (x1 + x2) / 2;
+    const centerY = (y1 + y2) / 2;
+    return [{
+      text,
+      x: centerX / imageWidth * pageWidth,
+      y: (imageHeight - centerY) / imageHeight * pageHeight,
+    }];
+  });
+}
 function parseStatementPeriod(text: string): { from?: string; to?: string } {
   const match = text.match(/(?:from|period\s*[:\-]?)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(?:to|through)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
   return {
@@ -181,8 +213,12 @@ export async function extractStatementBrandAssets(input: PdfInput): Promise<Stat
  */
 export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobStatement> {
   const pdf = await openPdf(input);
+  let ocrWorker: Awaited<ReturnType<typeof import('tesseract.js').createWorker>> | null = null;
+
   try {
     const allTextLines: string[] = [];
+    const leftTextLines: string[] = [];
+    const rightTextLines: string[] = [];
     const transactions: TransactionType[] = [];
     let textItemCount = 0;
     let openingBalance: number | undefined;
@@ -192,21 +228,83 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       const pageWidth = Math.max(1, Math.abs(page.view[2] - page.view[0]));
-      const items: TextCell[] = content.items.flatMap(item => {
+      const pageHeight = Math.max(1, Math.abs(page.view[3] - page.view[1]));
+      let items: TextCell[] = content.items.flatMap(item => {
         if (!('str' in item) || typeof item.str !== 'string' || !item.str.trim() || !('transform' in item)) return [];
         const transform = item.transform as number[];
-        textItemCount++;
         return [{ text: item.str.trim(), x: transform[4] ?? 0, y: transform[5] ?? 0 }];
       });
-      const rows = buildRows(items);
+
+      // The supplied BOB sample is a scanned/image-only PDF. Use an entirely
+      // local Tesseract.js worker for pages that have no selectable text.
+      if (!items.length) {
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+          throw new Error('This statement is image-only. Open it in the BOB World app to run the bundled on-device OCR engine.');
+        }
+        if (!ocrWorker) {
+          const { createWorker } = await import('tesseract.js');
+          const origin = window.location.origin;
+          ocrWorker = await createWorker('eng', 1, {
+            workerPath: new URL('/tesseract/worker.min.js', origin).href,
+            corePath: new URL('/tesseract/core/', origin).href.replace(/\/$/, ''),
+            langPath: new URL('/tesseract/lang', origin).href,
+            gzip: true,
+            workerBlobURL: true,
+            logger: message => {
+              if (message.status === 'recognizing text' && message.progress > 0) {
+                // Intentionally local-only: no telemetry or document content is sent anywhere.
+              }
+            },
+          });
+          await ocrWorker.setParameters({
+            tessedit_pageseg_mode: '6',
+            preserve_interword_spaces: '1',
+            user_defined_dpi: '300',
+          });
+        }
+
+        const viewport = page.getViewport({ scale: 3.2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('The browser could not render the scanned statement for local OCR.');
+        try {
+          await page.render({ canvasContext: context, viewport }).promise;
+          const result = await ocrWorker.recognize(canvas, {}, { hocr: true });
+          items = parseHocrWords(
+            result.data.hocr || '',
+            canvas.width,
+            canvas.height,
+            pageWidth,
+            pageHeight,
+          );
+        } finally {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+        if (!items.length) {
+          throw new Error('Local OCR could not read page ' + pageNumber + '. Existing account and transaction data were not changed.');
+        }
+      }
+
+      textItemCount += items.length;
+      const rows = buildRows(items, 2.5);
       let lastTransaction: TransactionType | undefined;
       let lastTransactionY: number | undefined;
 
       for (const row of rows) {
         const line = row.cells.map(cell => cell.text).join(' ').replace(/\s+/g, ' ').trim();
-        if (line) allTextLines.push(line);
+        if (line) {
+          allTextLines.push(line);
+          const leftLine = row.cells.filter(cell => cell.x / pageWidth < 0.5).map(cell => cell.text).join(' ').trim();
+          const rightLine = row.cells.filter(cell => cell.x / pageWidth >= 0.5).map(cell => cell.text).join(' ').trim();
+          if (leftLine) leftTextLines.push(leftLine);
+          if (rightLine) rightTextLines.push(rightLine);
+        }
+
         const dateCells = row.cells
-          .filter(cell => cell.x / pageWidth < 0.23)
+          .filter(cell => cell.x / pageWidth < 0.24)
           .map(cell => ({ cell, date: parseDate(cell.text) }))
           .filter((item): item is { cell: TextCell; date: string } => Boolean(item.date));
 
@@ -283,31 +381,37 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     }
 
     if (textItemCount === 0) {
-      throw new Error('This statement is image-only (scanned). The non-AI text parser found no selectable PDF text, so it cannot safely extract transaction rows. The original PDF and logo artwork can still be saved in Settings.');
+      throw new Error('No selectable text or readable scanned content was found. Existing account and transaction data were not changed.');
     }
     if (!transactions.length) {
-      throw new Error('The PDF contains selectable text, but no transaction rows matched the BOB statement layout. No existing account or transaction data was changed.');
+      throw new Error('The PDF was read locally, but no transaction rows matched the BOB statement layout. Existing account and transaction data were not changed.');
     }
 
     const text = allTextLines.join('\n');
-    const accountMatch = text.match(/(?:Account\s*(?:Number|No\.?|#)|A\/c\s*(?:No\.?|Number))\s*[:\-]?\s*([0-9][0-9\s-]{5,})/i);
+    const leftText = leftTextLines.join('\n');
+    const rightText = rightTextLines.join('\n');
+    const accountMatch = leftText.match(/(?:Account\s*(?:Number|No\.?|#)|A\/c\s*(?:No\.?|Number))\s*[:\-]?\s*([0-9][0-9\s-]{5,})/i);
     const accountNumber = accountMatch?.[1]?.replace(/\D/g, '') || '';
     if (!accountNumber) {
-      throw new Error('Transactions were found, but the account number could not be verified. Add the account number in Settings before importing. No existing account or transaction data was changed.');
+      throw new Error('Transactions were found, but the account number could not be verified. Add it in Settings. No existing account or transaction data was changed.');
     }
 
     const period = parseStatementPeriod(text);
     const accountDetails: Partial<AccountDetailsType> = {
-      name: fieldFromText(text, ['Account Name', 'Account Holder Name', 'Customer Name']),
+      name: fieldFromText(leftText, ['Account Name', 'Account Holder Name', 'Customer Name']),
       accountNumber,
-      ifscCode: fieldFromText(text, ['IFSC Code', 'IFSC']),
-      branchName: fieldFromText(text, ['Branch Name']),
-      branchAddress: fieldFromText(text, ['Branch Address']),
-      customerAddress: fieldFromText(text, ['Customer Address', 'Mailing Address', 'Communication Address']),
-      customerCity: fieldFromText(text, ['Customer City', 'City']),
-      micrCode: fieldFromText(text, ['MICR Code', 'MICR']),
-      nominee: fieldFromText(text, ['Nominee Name', 'Nominee']),
-      ckycNumber: fieldFromText(text, ['CKYC Number', 'CKYC No']),
+      ifscCode: fieldFromText(rightText, ['IFSC Code', 'IFSC']),
+      branchName: fieldFromText(rightText, ['Branch Name']),
+      branchAddress: fieldFromText(rightText, ['Branch Address']),
+      customerAddress: fieldFromText(leftText, ['Customer Address', 'Mailing Address', 'Communication Address']),
+      customerCity: fieldFromText(leftText, ['Customer City']),
+      customerPin: fieldFromText(leftText, ['Customer PIN', 'PIN Code', 'Pincode']),
+      branchCity: fieldFromText(rightText, ['Branch City']),
+      branchPin: fieldFromText(rightText, ['Branch PIN', 'PIN Code', 'Pincode']),
+      micrCode: fieldFromText(rightText, ['MICR Code', 'MICR']),
+      nominee: fieldFromText(leftText, ['Nominee Name', 'Nominee']),
+      ckycNumber: fieldFromText(leftText, ['CKYC Number', 'CKYC No']),
+      customerId: fieldFromText(leftText, ['Customer ID', 'Customer Id', 'CIF ID', 'CIF Number']),
       accountType: /\bcurrent\s+account\b/i.test(text) ? 'Current' :
         /\bsaving(?:s)?\s+account\b|\bSBA\b/i.test(text) ? 'Saving' : undefined,
       statementOpeningBalance: openingBalance,
@@ -326,6 +430,9 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       periodTo: period.to,
     };
   } finally {
+    if (ocrWorker) {
+      try { await ocrWorker.terminate(); } catch (error) { console.warn('Local OCR worker cleanup failed:', error); }
+    }
     await pdf.destroy();
   }
 }
