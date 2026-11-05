@@ -222,7 +222,7 @@ export function generateBobStatementPdf(options: BobStatementPdfOptions): Blob {
     },
   });
 
-  const totalPages = doc.internal.getNumberOfPages();
+  const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page++) {
     doc.setPage(page);
     doc.setFont('helvetica', 'normal');
