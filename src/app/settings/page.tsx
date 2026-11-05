@@ -1083,7 +1083,7 @@ export default function SettingsPage() {
 
             <section className="space-y-4">
                  <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
-                <CardDescription>Extract selectable PDF text locally, then replace saved account, balance and transaction data. No Genkit, LLM or cloud extraction is used. Image-only scanned PDFs cannot be parsed by this text-only tool.</CardDescription>
+                <CardDescription>Extract selectable PDF text locally. Image-only pages are processed with the bundled offline OCR engine on this device. No Genkit, generative AI, cloud OCR, or document upload is used. A successful parse replaces the saved account, balance and transaction data.</CardDescription>
                 <div>
                     <Button
                         type="button"
