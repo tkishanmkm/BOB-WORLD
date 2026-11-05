@@ -14,7 +14,7 @@ import { format, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { FileDown } from 'lucide-react';
 import { useState } from 'react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { STATEMENT_LOGO_KEY } from '@/lib/constants';
 
 interface TransactionReceiptDialogProps {
