@@ -33,6 +33,8 @@ import {
   INITIAL_LIVE_AGENT_MESSAGES,
   LIVE_AGENT_MESSAGES_STORAGE_KEY,
   STATEMENT_PDF_KEY,
+  STATEMENT_LOGO_KEY,
+  STATEMENT_BANK_LOGO_KEY,
 } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText } from 'lucide-react';
@@ -40,7 +42,7 @@ import { AddTransactionDialog } from "@/components/passbook/add-transaction-dial
 import { AddPayeeDialog } from "@/components/fund-transfer/add-payee-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { extractTransactionsFromPdf, type ExtractedTransaction } from '@/ai/flows/extract-transactions-from-pdf-flow';
+import { parseBobStatementPdf, extractStatementBrandAssets } from '@/lib/bob-statement-parser';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,7 +89,9 @@ type ImageKeys =
   | 'rdBanner' 
   | 'debitCardIllustration' 
   | 'linkBankIllustration' 
-  | 'promoWomanPayment';
+  | 'promoWomanPayment'
+  | 'statementLogo'
+  | 'statementBankLogo';
 
 
 export default function SettingsPage() {
@@ -138,6 +142,8 @@ export default function SettingsPage() {
     debitCardIllustration: { dataUri: null, preview: 'https://placehold.co/200x120.png', defaultHint: 'debit card illustration' },
     linkBankIllustration: { dataUri: null, preview: 'https://placehold.co/120x100.png', defaultHint: 'mobile banking app' },
     promoWomanPayment: { dataUri: null, preview: 'https://placehold.co/150x100.png', defaultHint: 'woman phone payment' },
+    statementLogo: { dataUri: null, preview: 'https://placehold.co/220x90.png?text=BOB+World+Logo', defaultHint: 'BOB World logo' },
+    statementBankLogo: { dataUri: null, preview: 'https://placehold.co/220x90.png?text=Bank+Logo', defaultHint: 'Bank of Baroda wordmark' },
   });
 
   const [clientRenderedTransactions, setClientRenderedTransactions] = useState<Array<TransactionType & { formattedDate: string }>>([]);
@@ -246,6 +252,8 @@ export default function SettingsPage() {
         { key: 'debitCardIllustration', storageKey: DEBIT_CARD_ILLUSTRATION_KEY, defaultPreview: 'https://placehold.co/200x120.png' },
         { key: 'linkBankIllustration', storageKey: LINK_BANK_ILLUSTRATION_KEY, defaultPreview: 'https://placehold.co/120x100.png' },
         { key: 'promoWomanPayment', storageKey: PROMO_WOMAN_PAYMENT_KEY, defaultPreview: 'https://placehold.co/150x100.png' },
+        { key: 'statementLogo', storageKey: STATEMENT_LOGO_KEY, defaultPreview: 'https://placehold.co/220x90.png?text=BOB+World+Logo' },
+        { key: 'statementBankLogo', storageKey: STATEMENT_BANK_LOGO_KEY, defaultPreview: 'https://placehold.co/220x90.png?text=Bank+Logo' },
     ];
 
     setImageStates(prevImages => {
@@ -326,24 +334,43 @@ export default function SettingsPage() {
     event.target.value = ''; 
   };
   
-  const handleStatementPdfUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStatementPdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({ title: "Invalid File Type", description: "Please select a PDF file.", variant: "destructive" });
-        if (event.target) event.target.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUri = reader.result as string;
-        localStorage.setItem(STATEMENT_PDF_KEY, dataUri);
-        setStatementPdfName(file.name);
-        toast({ title: "Statement PDF Uploaded", description: `${file.name} has been saved.` });
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.type !== "application/pdf" || file.size > 8 * 1024 * 1024) {
+      toast({ title: "Invalid Statement PDF", description: "Select a PDF file smaller than 8 MB.", variant: "destructive" });
+      event.target.value = '';
+      return;
     }
-    event.target.value = '';
+    try {
+      const dataUri = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read the selected PDF.'));
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the selected PDF.'));
+        reader.readAsDataURL(file);
+      });
+      localStorage.setItem(STATEMENT_PDF_KEY, dataUri);
+      setStatementPdfName(file.name);
+      try {
+        const assets = await extractStatementBrandAssets(await file.arrayBuffer());
+        if (assets.bobWorldLogo) {
+          localStorage.setItem(STATEMENT_LOGO_KEY, assets.bobWorldLogo);
+          setImageStates(prev => ({ ...prev, statementLogo: { ...prev.statementLogo, dataUri: assets.bobWorldLogo!, preview: assets.bobWorldLogo! } }));
+        }
+        if (assets.bankLogo) {
+          localStorage.setItem(STATEMENT_BANK_LOGO_KEY, assets.bankLogo);
+          setImageStates(prev => ({ ...prev, statementBankLogo: { ...prev.statementBankLogo, dataUri: assets.bankLogo!, preview: assets.bankLogo! } }));
+        }
+        toast({ title: "Statement resources saved", description: file.name + " saved locally; logo artwork extracted into Settings." });
+      } catch (assetError) {
+        console.warn('Statement logo extraction failed:', assetError);
+        toast({ title: "Statement PDF saved", description: "The original PDF is saved. Upload the BOB World logo manually in Manage Application Images if needed." });
+      }
+    } catch (error) {
+      toast({ title: "Statement PDF could not be saved", description: error instanceof Error ? error.message : "Local storage is unavailable.", variant: "destructive" });
+    } finally {
+      event.target.value = '';
+    }
   };
 
   const imageUploadConfig: Array<{ label: string, key: ImageKeys, defaultHint: string, storageKey: string }> = [
@@ -358,6 +385,8 @@ export default function SettingsPage() {
     { label: "Debit Card Illustration (Account Actions)", key: 'debitCardIllustration', defaultHint: imageStates.debitCardIllustration.defaultHint, storageKey: DEBIT_CARD_ILLUSTRATION_KEY },
     { label: "Link Bank Illustration (Current Account Details)", key: 'linkBankIllustration', defaultHint: imageStates.linkBankIllustration.defaultHint, storageKey: LINK_BANK_ILLUSTRATION_KEY },
     { label: "Promo Banner Image (Current Account Details)", key: 'promoWomanPayment', defaultHint: imageStates.promoWomanPayment.defaultHint, storageKey: PROMO_WOMAN_PAYMENT_KEY },
+    { label: "BOB World Logo (Statement and Receipt PDFs)", key: 'statementLogo', defaultHint: imageStates.statementLogo.defaultHint, storageKey: STATEMENT_LOGO_KEY },
+    { label: "Bank Logo (Statement PDF)", key: 'statementBankLogo', defaultHint: imageStates.statementBankLogo.defaultHint, storageKey: STATEMENT_BANK_LOGO_KEY },
   ];
 
   const clearImage = (key: ImageKeys) => {
@@ -469,6 +498,8 @@ export default function SettingsPage() {
             debitCardIllustration: DEBIT_CARD_ILLUSTRATION_KEY,
             linkBankIllustration: LINK_BANK_ILLUSTRATION_KEY,
             promoWomanPayment: PROMO_WOMAN_PAYMENT_KEY,
+             statementLogo: STATEMENT_LOGO_KEY,
+             statementBankLogo: STATEMENT_BANK_LOGO_KEY,
         };
 
         if (importedData.images) {
@@ -639,107 +670,56 @@ export default function SettingsPage() {
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      toast({ title: "Invalid File Type", description: "Please select a PDF file.", variant: "destructive" });
-      if (event.target) event.target.value = ''; 
+    if (file.type !== "application/pdf" || file.size > 8 * 1024 * 1024) {
+      toast({ title: "Invalid Statement PDF", description: "Select a PDF file smaller than 8 MB.", variant: "destructive" });
+      event.target.value = '';
       return;
     }
-    setIsProcessingPdf(true); 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+    setIsProcessingPdf(true);
+    try {
+      const pdfDataUri = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read the statement PDF.'));
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the statement PDF.'));
+        reader.readAsDataURL(file);
+      });
+      const parsed = await parseBobStatementPdf(await file.arrayBuffer());
+      const parsedDetails = Object.fromEntries(Object.entries(parsed.accountDetails).filter(([, value]) => value !== undefined && value !== null && value !== '')) as Partial<AccountDetailsType>;
+      const nextAccountDetails: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS, ...accountDetails, ...parsedDetails, accountNumber: parsed.accountNumber };
+      const netMovement = parsed.transactions.reduce((total, tx) => total + (tx.type === 'credit' ? Math.abs(tx.amount) : -Math.abs(tx.amount)), 0);
+      const nextBalance = parsed.closingBalance ?? ((parsed.openingBalance ?? balance) + netMovement);
+      const newestFirst = [...parsed.transactions].sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
+
+      localStorage.setItem(STATEMENT_PDF_KEY, pdfDataUri);
+      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(nextAccountDetails));
+      localStorage.setItem(BALANCE_STORAGE_KEY, String(nextBalance));
+      localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(newestFirst));
+      setStatementPdfName(file.name);
+      setAccountDetails(nextAccountDetails);
+      setBalance(nextBalance);
+      setTransactions(newestFirst);
       try {
-        const pdfDataUri = e.target?.result as string;
-        const result = await extractTransactionsFromPdf({ pdfDataUri }); 
-
-        if (result.transactions && result.transactions.length > 0) {
-          let newBalanceTemp = balance;
-          const successfullyAddedTransactions: TransactionType[] = [];
-          let skippedCount = 0;
-
-          result.transactions.forEach((extractedTx: ExtractedTransaction) => {
-            if (!extractedTx.date || !extractedTx.description || typeof extractedTx.amount !== 'number' || !extractedTx.type) {
-              console.warn('Skipping transaction from PDF due to missing core fields:', extractedTx);
-              skippedCount++;
-              return;
-            }
-            
-            let parsedDate = new Date(extractedTx.date); 
-
-            if (isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100 ) {
-                const dateStr = extractedTx.date.trim();
-                const partsDMY = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2}|\d{4})$/);
-                if (partsDMY) {
-                    const day = parseInt(partsDMY[1], 10);
-                    const month = parseInt(partsDMY[2], 10);
-                    let year = parseInt(partsDMY[3], 10);
-                    if (year < 100) year += (year < 50 ? 2000 : 1900); 
-                    
-                    if (day > 0 && day <= 31 && month > 0 && month <= 12 && year >= 1980 && year <= 2100) {
-                        const tempDate = new Date(year, month - 1, day);
-                        if (tempDate.getFullYear() === year && tempDate.getMonth() === month - 1 && tempDate.getDate() === day) {
-                           parsedDate = tempDate;
-                        }
-                    }
-                }
-                if ((isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100) && !partsDMY) {
-                    const partsMDY = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2}|\d{4})$/);
-                    if (partsMDY) {
-                        const month = parseInt(partsMDY[1], 10);
-                        const day = parseInt(partsMDY[2], 10);
-                        let year = parseInt(partsMDY[3], 10);
-                        if (year < 100) year += (year < 50 ? 2000 : 1900);
-                        if (day > 0 && day <= 31 && month > 0 && month <= 12 && year >= 1980 && year <= 2100) {
-                           const tempDate = new Date(year, month - 1, day);
-                           if (tempDate.getFullYear() === year && tempDate.getMonth() === month - 1 && tempDate.getDate() === day) {
-                               parsedDate = tempDate;
-                           }
-                        }
-                    }
-                }
-            }
-
-
-            if (isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100 ) { 
-                console.warn(`Could not reliably parse date for PDF transaction: "${extractedTx.description}" with date string "${extractedTx.date}". Skipping.`);
-                skippedCount++;
-                return;
-            }
-
-            const newTransaction: TransactionType = {
-              id: crypto.randomUUID(),
-              date: parsedDate.toISOString(), 
-              description: extractedTx.description,
-              amount: extractedTx.amount,
-              type: extractedTx.type,
-            };
-            successfullyAddedTransactions.push(newTransaction);
-
-            if (newTransaction.type === 'credit') newBalanceTemp += newTransaction.amount;
-            else newBalanceTemp -= newTransaction.amount;
-          });
-
-          if (successfullyAddedTransactions.length > 0) {
-            setTransactions(prev => [...successfullyAddedTransactions, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() ));
-            setBalance(newBalanceTemp);
-            toast({ title: "Transactions Extracted", description: `${successfullyAddedTransactions.length} transactions added. ${skippedCount > 0 ? `${skippedCount} skipped due to date/data issues.` : ''}` });
-          } else {
-             toast({ title: "No New Transactions Added", description: `AI found no valid transactions or all were skipped due to date/data issues.` });
-          }
-        } else {
-          toast({ title: "No Transactions Found by AI", description: "AI could not find transactions or the format was not recognized.", variant: "default" });
+        const assets = await extractStatementBrandAssets(await file.arrayBuffer());
+        if (assets.bobWorldLogo) {
+          localStorage.setItem(STATEMENT_LOGO_KEY, assets.bobWorldLogo);
+          setImageStates(prev => ({ ...prev, statementLogo: { ...prev.statementLogo, dataUri: assets.bobWorldLogo!, preview: assets.bobWorldLogo! } }));
         }
-      } catch (error: any) {
-        console.error("Error processing PDF:", error);
-        toast({ title: "PDF Processing Error", description: error.message || "Error extracting transactions. Check console.", variant: "destructive" });
-      } finally {
-        setIsProcessingPdf(false); 
+        if (assets.bankLogo) {
+          localStorage.setItem(STATEMENT_BANK_LOGO_KEY, assets.bankLogo);
+          setImageStates(prev => ({ ...prev, statementBankLogo: { ...prev.statementBankLogo, dataUri: assets.bankLogo!, preview: assets.bankLogo! } }));
+        }
+      } catch (assetError) {
+        console.warn('Statement logo extraction failed after import:', assetError);
       }
-    };
-    reader.readAsDataURL(file);
-    if (event.target) event.target.value = ''; 
+      toast({ title: "Statement imported", description: newestFirst.length + " transactions replaced the previous list. Account details and balance updated; payees and app appearance preserved." });
+    } catch (error) {
+      console.error("Local statement extraction failed:", error);
+      toast({ title: "Statement extraction failed", description: error instanceof Error ? error.message : "Could not parse the statement. Existing account and transaction data were not changed.", variant: "destructive" });
+    } finally {
+      setIsProcessingPdf(false);
+      event.target.value = '';
+    }
   };
-
   const openAddLiveAgentMessageDialog = () => {
     setEditingLiveAgentMessage(null);
     setCurrentMessageContent('');
@@ -866,8 +846,25 @@ export default function SettingsPage() {
             </section>
 
              <section className="space-y-4">
+               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement Account & Branch Fields</h3>
+               <CardDescription>Complete any detail that is missing from the uploaded statement. These values are used when generating a new statement PDF.</CardDescription>
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                 <div><Label htmlFor="customerAddress">Customer Address</Label><Input id="customerAddress" value={accountDetails.customerAddress || ''} onChange={(e) => handleDetailsChange('customerAddress', e.target.value)} className="mt-1" placeholder="Customer postal address" /></div>
+                 <div><Label htmlFor="customerPin">Customer PIN / Postal Code</Label><Input id="customerPin" value={accountDetails.customerPin || ''} onChange={(e) => handleDetailsChange('customerPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="branchAddress">Branch Address</Label><Input id="branchAddress" value={accountDetails.branchAddress || ''} onChange={(e) => handleDetailsChange('branchAddress', e.target.value)} className="mt-1" placeholder="Branch postal address" /></div>
+                 <div><Label htmlFor="branchCity">Branch City</Label><Input id="branchCity" value={accountDetails.branchCity || ''} onChange={(e) => handleDetailsChange('branchCity', e.target.value)} className="mt-1" placeholder="City" /></div>
+                 <div><Label htmlFor="branchPin">Branch PIN / Postal Code</Label><Input id="branchPin" value={accountDetails.branchPin || ''} onChange={(e) => handleDetailsChange('branchPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="micrCode">MICR Code</Label><Input id="micrCode" value={accountDetails.micrCode || ''} onChange={(e) => handleDetailsChange('micrCode', e.target.value)} className="mt-1" inputMode="numeric" maxLength={9} placeholder="9-digit MICR" /></div>
+                 <div><Label htmlFor="statementOpeningBalance">Statement Opening Balance (INR)</Label><Input id="statementOpeningBalance" type="number" min="0" step="0.01" value={accountDetails.statementOpeningBalance ?? ''} onChange={(e) => setAccountDetails(prev => ({ ...prev, statementOpeningBalance: e.target.value === '' ? undefined : Number(e.target.value) }))} className="mt-1" placeholder="Opening balance" /></div>
+                 <div><Label htmlFor="statementPeriodFrom">Statement Period From</Label><Input id="statementPeriodFrom" type="date" value={accountDetails.statementPeriodFrom ? accountDetails.statementPeriodFrom.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodFrom', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div><Label htmlFor="statementPeriodTo">Statement Period To</Label><Input id="statementPeriodTo" type="date" value={accountDetails.statementPeriodTo ? accountDetails.statementPeriodTo.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodTo', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div className="sm:col-span-2"><Label htmlFor="statementNote">Statement Footer Note</Label><Textarea id="statementNote" value={accountDetails.statementNote || ''} onChange={(e) => handleDetailsChange('statementNote', e.target.value)} className="mt-1" rows={2} placeholder="Computer-generated statement note" /></div>
+               </div>
+             </section>
+
+             <section className="space-y-4">
               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement PDF Management</h3>
-              <CardDescription>Upload a PDF file to be used when the "Download statement" button is clicked in the app.</CardDescription>
+              <CardDescription>Save the original statement locally and extract the BOB World and bank logo artwork into Settings. The Account Statement page generates a new PDF from saved transactions.</CardDescription>
               <div>
                 <Label htmlFor="statement-pdf-upload">Statement PDF</Label>
                 <div className="flex items-center gap-2 mt-1">
@@ -903,7 +900,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                 <p className="text-xs text-muted-foreground mt-1">This PDF will be downloaded when a user clicks "Download statement".</p>
+                 <p className="text-xs text-muted-foreground mt-1">The source PDF is retained locally. It is not reused as the generated statement background, so old account transactions cannot be carried into a new statement.</p>
               </div>
             </section>
 
@@ -1067,8 +1064,8 @@ export default function SettingsPage() {
             </section>
 
             <section className="space-y-4">
-                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Automated Transaction Entry</h3>
-                <CardDescription>Upload a PDF bank statement to automatically add transactions. (Prototype feature - AI parsing quality may vary.)</CardDescription>
+                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
+                <CardDescription>Extract selectable PDF text locally, then replace saved account, balance and transaction data. No Genkit, LLM or cloud extraction is used. Image-only scanned PDFs cannot be parsed by this text-only tool.</CardDescription>
                 <div>
                     <Button
                         type="button"
@@ -1081,7 +1078,7 @@ export default function SettingsPage() {
                         ) : (
                             <UploadCloud className="mr-2 h-4 w-4" />
                         )}
-                        {isProcessingPdf ? "Processing PDF..." : "Add Transactions by PDF"}
+                        {isProcessingPdf ? "Parsing statement locally..." : "Import Statement Transactions"}
                     </Button>
                     <input
                         type="file"
