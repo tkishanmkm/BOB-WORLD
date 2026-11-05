@@ -8,6 +8,7 @@ export interface ParsedBobStatement {
   closingBalance?: number;
   periodFrom?: string;
   periodTo?: string;
+  ocrAdjustedTransactions?: number;
 }
 
 export interface StatementBrandAssets {
@@ -16,7 +17,7 @@ export interface StatementBrandAssets {
 }
 
 type PdfInput = string | ArrayBuffer | Uint8Array;
-type TextCell = { text: string; x: number; y: number };
+type TextCell = { text: string; x: number; y: number; confidence?: number };
 type TextRow = { y: number; cells: TextCell[] };
 
 const DATE_RE = /^(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}|\d{8})$/;
@@ -166,12 +167,13 @@ function parseHocrWords(
   return Array.from(parsed.querySelectorAll('.ocrx_word')).flatMap(element => {
     const text = (element.textContent || '').replace(/\s+/g, ' ').trim();
     const title = element.getAttribute('title') || '';
-    const box = /bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i.exec(title);
+    const box = /bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+);[^;]*x_wconf\s+(\d+)/i.exec(title);
     if (!text || !box) return [];
     const x1 = Number(box[1]);
     const y1 = Number(box[2]);
     const x2 = Number(box[3]);
     const y2 = Number(box[4]);
+    const confidence = Number(box[5]);
     if (![x1, y1, x2, y2].every(Number.isFinite) || x2 <= x1 || y2 <= y1) return [];
     const centerX = (x1 + x2) / 2;
     const centerY = (y1 + y2) / 2;
@@ -179,6 +181,7 @@ function parseHocrWords(
       text,
       x: centerX / imageWidth * pageWidth,
       y: (imageHeight - centerY) / imageHeight * pageHeight,
+      confidence,
     }];
   });
 }
@@ -256,6 +259,8 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     const leftTextLines: string[] = [];
     const rightTextLines: string[] = [];
     const transactions: TransactionType[] = [];
+    const transactionOcrQuality = new Map<string, { amountConfidence?: number; balanceConfidence?: number }>();
+    let ocrAdjustedTransactions = 0;
     let textItemCount = 0;
     let openingBalance: number | undefined;
     let closingBalance: number | undefined;
@@ -273,7 +278,8 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
 
       // The supplied BOB sample is a scanned/image-only PDF. Use an entirely
       // local Tesseract.js worker for pages that have no selectable text.
-      if (!items.length) {
+      const pageUsesOcr = items.length === 0;
+      if (pageUsesOcr) {
         if (typeof window === 'undefined' || typeof document === 'undefined') {
           throw new Error('This statement is image-only. Open it in the BOB World app to run the bundled on-device OCR engine.');
         }
@@ -325,7 +331,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       }
 
       textItemCount += items.length;
-      const rows = buildRows(items, 2.5);
+      const rows = buildRows(items, pageUsesOcr ? 6 : 2.5);
       let lastTransaction: TransactionType | undefined;
       let lastTransactionY: number | undefined;
 
@@ -374,16 +380,20 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
           .trim();
         if (!description) continue;
 
-        const amountInColumn = (min: number, max: number): number | undefined => {
+        const amountInColumn = (min: number, max: number) => {
           const candidates = row.cells
             .filter(cell => cell.x / pageWidth >= min && cell.x / pageWidth < max)
-            .map(cell => parseMoney(cell.text))
-            .filter((value): value is number => value !== null);
-          return candidates.length ? candidates[0] : undefined;
+            .map(cell => ({ cell, value: parseMoney(cell.text) }))
+            .filter((candidate): candidate is { cell: TextCell; value: number } => candidate.value !== null)
+            .sort((a, b) => (b.cell.confidence ?? 100) - (a.cell.confidence ?? 100));
+          return candidates[0];
         };
-        const debit = amountInColumn(0.64, 0.77);
-        const credit = amountInColumn(0.77, 0.90);
-        const balance = amountInColumn(0.90, 1.02);
+        const debitCandidate = amountInColumn(0.64, 0.77);
+        const creditCandidate = amountInColumn(0.77, 0.90);
+        const balanceCandidate = amountInColumn(0.90, 1.02);
+        const debit = debitCandidate?.value;
+        const credit = creditCandidate?.value;
+        const balance = balanceCandidate?.value;
 
         if (/opening\s+balance|balance\s+brought\s+forward/i.test(description)) {
           if (balance !== undefined) openingBalance = balance;
@@ -410,6 +420,13 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
           ...(balance !== undefined ? { balanceAfter: balance } : {}),
         };
         transactions.push(transaction);
+        if (ocrWorker) {
+          const amountCell = debitCandidate?.cell ?? creditCandidate?.cell;
+          transactionOcrQuality.set(transaction.id, {
+            amountConfidence: amountCell?.confidence,
+            balanceConfidence: balanceCandidate?.cell.confidence,
+          });
+        }
         if (balance !== undefined) closingBalance = balance;
         lastTransaction = transaction;
         lastTransactionY = row.y;
@@ -435,9 +452,28 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
         }
         const movement = transaction.type === 'credit' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount);
         const expected = Math.round((running + movement) * 100) / 100;
-        const observed = Math.round(transaction.balanceAfter * 100) / 100;
+        let observed = Math.round(transaction.balanceAfter * 100) / 100;
         if (Math.abs(expected - observed) > 0.01) {
-          unreconciled.push(transaction.date + ' (expected ' + expected.toFixed(2) + ', read ' + observed.toFixed(2) + ')');
+          const quality = transactionOcrQuality.get(transaction.id);
+          const amountConfidence = quality?.amountConfidence ?? 100;
+          const balanceConfidence = quality?.balanceConfidence ?? 0;
+          const balanceMovement = Math.round((observed - running) * 100) / 100;
+          const inferredType = balanceMovement >= 0 ? 'credit' : 'debit';
+          const inferredAmount = Math.abs(balanceMovement);
+
+          // Correct only when the amount cell is low-confidence, the running
+          // balance cell is high-confidence, and the inferred direction agrees.
+          if (amountConfidence < 75 && balanceConfidence >= 85 && inferredAmount > 0 &&
+              inferredType === transaction.type) {
+            transaction.amount = inferredAmount;
+            ocrAdjustedTransactions++;
+          } else if (balanceConfidence < 75 && amountConfidence >= 85) {
+            transaction.balanceAfter = expected;
+            observed = expected;
+            ocrAdjustedTransactions++;
+          } else {
+            unreconciled.push(transaction.date + ' (expected ' + expected.toFixed(2) + ', read ' + observed.toFixed(2) + ')');
+          }
         }
         running = observed;
       }
@@ -449,6 +485,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     }
 
 
+    closingBalance = transactions[transactions.length - 1]?.balanceAfter ?? closingBalance;
     const text = allTextLines.join('\n');
     const leftText = leftTextLines.join('\n');
     const rightText = rightTextLines.join('\n');
@@ -469,7 +506,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     const accountDetails: Partial<AccountDetailsType> = {
       name: fieldFromText(leftText, ['Account Name', 'Account Holder Name', 'Customer Name']),
       accountNumber,
-      ifscCode: (() => { const code = fieldFromText(rightText, ['IFSC Code', 'IFSC']).replace(/\s/g, '').toUpperCase(); return /^[A-Z]{4}O[A-Z0-9]{6}$/.test(code) ? code.replace(/^(.{4})O/, '$10') : code; })(),
+      ifscCode: (() => { const code = fieldFromText(rightText, ['IFSC Code', 'IFSC']).replace(/\s/g, '').toUpperCase(); return /^[A-Z]{4}O[A-Z0-9]{6}$/.test(code) ? code.replace(/^(.{4})O/, (_, prefix: string) => prefix + '0') : code; })(),
       branchName,
       branchAddress,
       customerAddress,
@@ -497,6 +534,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       closingBalance,
       periodFrom: period.from,
       periodTo: period.to,
+      ocrAdjustedTransactions,
     };
   } finally {
     if (ocrWorker) {
