@@ -397,17 +397,24 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     }
 
     const period = parseStatementPeriod(text);
+    const customerAddress = fieldFromText(leftText, ['Customer Address', 'Mailing Address', 'Communication Address']);
+    const branchAddress = fieldFromText(rightText, ['Branch Address']);
+    const branchName = fieldFromText(rightText, ['Branch Name']);
+    const customerPin = fieldFromText(leftText, ['Customer PIN', 'PIN Code', 'Pincode']) ||
+      customerAddress.match(/\b\d{6}\b/)?.[0] || '';
+    const branchPin = fieldFromText(rightText, ['Branch PIN', 'PIN Code', 'Pincode']) ||
+      branchAddress.match(/\b\d{6}\b/)?.[0] || '';
     const accountDetails: Partial<AccountDetailsType> = {
       name: fieldFromText(leftText, ['Account Name', 'Account Holder Name', 'Customer Name']),
       accountNumber,
       ifscCode: fieldFromText(rightText, ['IFSC Code', 'IFSC']),
-      branchName: fieldFromText(rightText, ['Branch Name']),
-      branchAddress: fieldFromText(rightText, ['Branch Address']),
-      customerAddress: fieldFromText(leftText, ['Customer Address', 'Mailing Address', 'Communication Address']),
+      branchName,
+      branchAddress,
+      customerAddress,
       customerCity: fieldFromText(leftText, ['Customer City']),
-      customerPin: fieldFromText(leftText, ['Customer PIN', 'PIN Code', 'Pincode']),
-      branchCity: fieldFromText(rightText, ['Branch City']),
-      branchPin: fieldFromText(rightText, ['Branch PIN', 'PIN Code', 'Pincode']),
+      customerPin,
+      branchCity: fieldFromText(rightText, ['Branch City']) || branchName,
+      branchPin,
       micrCode: fieldFromText(rightText, ['MICR Code', 'MICR']),
       nominee: fieldFromText(leftText, ['Nominee Name', 'Nominee']),
       ckycNumber: fieldFromText(leftText, ['CKYC Number', 'CKYC No']),
