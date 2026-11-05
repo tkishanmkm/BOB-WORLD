@@ -19,8 +19,8 @@ type PdfInput = string | ArrayBuffer | Uint8Array;
 type TextCell = { text: string; x: number; y: number };
 type TextRow = { y: number; cells: TextCell[] };
 
-const DATE_RE = /^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})$/;
-const MONEY_RE = /^\(?-?\s*(?:₹|INR|Rs\.?\s*)?\d[\d,]*(?:\.\d{1,2})?\)?$/i;
+const DATE_RE = /^(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}|\d{8})$/;
+const MONEY_RE = /^\(?-?\s*(?:₹|INR|Rs\.?\s*)?\d[\d,.\s]*(?:CR|DR)?\)?$/i;
 
 function bytesFromInput(input: PdfInput): Uint8Array {
   if (typeof input !== 'string') {
@@ -52,14 +52,28 @@ async function openPdf(input: PdfInput) {
 }
 
 function parseDate(value: string): string | null {
-  const raw = value.trim();
+  const raw = value.trim().replace(/[()]/g, '');
   if (!DATE_RE.test(raw)) return null;
-  const parts = raw.split(/[/-]/).map(Number);
   let year: number;
   let month: number;
   let day: number;
-  if (parts[0] > 31) [year, month, day] = parts;
-  else [day, month, year] = parts;
+  if (/^\d{8}$/.test(raw)) {
+    const first = Number(raw.slice(0, 4));
+    if (first >= 1900 && first <= 2100) {
+      year = first;
+      month = Number(raw.slice(4, 6));
+      day = Number(raw.slice(6, 8));
+    } else {
+      day = Number(raw.slice(0, 2));
+      month = Number(raw.slice(2, 4));
+      year = Number(raw.slice(4, 8));
+    }
+  } else {
+    const parts = raw.split(/[./-]/).map(Number);
+    if (parts.length !== 3) return null;
+    if (parts[0] > 31) [year, month, day] = parts;
+    else [day, month, year] = parts;
+  }
   if (year < 100) year += year < 50 ? 2000 : 1900;
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
@@ -67,16 +81,38 @@ function parseDate(value: string): string | null {
 }
 
 function parseMoney(value: string): number | null {
-  if (!MONEY_RE.test(value)) return null;
-  const normalized = value
-    .replace(/[₹,\s]/g, '')
-    .replace(/^(?:INR|Rs\.?)/i, '')
-    .replace(/[()]/g, '')
-    .trim();
+  let raw = value.trim()
+    .replace(/^(?:INR|Rs\\.?|₹)\\s*/i, '')
+    .replace(/\\s+/g, '')
+    .replace(/(?:CR|DR)$/i, '');
+  let negative = false;
+  if (raw.startsWith('(') && raw.endsWith(')')) {
+    negative = true;
+    raw = raw.slice(1, -1);
+  }
+  if (raw.startsWith('-')) {
+    negative = true;
+    raw = raw.slice(1);
+  }
+  if (!raw || !/^[\\d,.]+$/.test(raw)) return null;
+  const lastSeparator = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
+  let normalized: string;
+  if (lastSeparator >= 0) {
+    const integerDigits = raw.slice(0, lastSeparator).replace(/\\D/g, '');
+    const decimalDigits = raw.slice(lastSeparator + 1).replace(/\\D/g, '');
+    if (decimalDigits.length === 1 || decimalDigits.length === 2) {
+      normalized = (integerDigits || '0') + '.' + decimalDigits.padEnd(2, '0');
+    } else {
+      normalized = raw.replace(/\\D/g, '');
+    }
+  } else {
+    normalized = raw.replace(/\\D/g, '');
+  }
+  if (!normalized) return null;
   const parsed = Number(normalized);
-  return normalized && Number.isFinite(parsed) ? Math.abs(parsed) : null;
+  if (!Number.isFinite(parsed)) return null;
+  return negative ? -Math.abs(parsed) : Math.abs(parsed);
 }
-
 function buildRows(items: TextCell[], tolerance = 2.2): TextRow[] {
   const rows: TextRow[] = [];
   for (const item of items) {
@@ -257,13 +293,13 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
             },
           });
           await ocrWorker.setParameters({
-            tessedit_pageseg_mode: '6',
+            tessedit_pageseg_mode: '11',
             preserve_interword_spaces: '1',
             user_defined_dpi: '300',
           });
         }
 
-        const viewport = page.getViewport({ scale: 3.2 });
+        const viewport = page.getViewport({ scale: 4.0 });
         const canvas = document.createElement('canvas');
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
@@ -386,6 +422,32 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
     if (!transactions.length) {
       throw new Error('The PDF was read locally, but no transaction rows matched the BOB statement layout. Existing account and transaction data were not changed.');
     }
+    if (ocrWorker) {
+      if (openingBalance === undefined) {
+        throw new Error('The scanned statement did not yield a reliable opening balance. Add it in Settings and retry; no saved data was changed.');
+      }
+      let running = openingBalance;
+      const unreconciled: string[] = [];
+      for (const transaction of transactions) {
+        if (transaction.balanceAfter === undefined) {
+          unreconciled.push(transaction.date + ' ' + transaction.description.slice(0, 32) + ' (missing balance)');
+          continue;
+        }
+        const movement = transaction.type === 'credit' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount);
+        const expected = Math.round((running + movement) * 100) / 100;
+        const observed = Math.round(transaction.balanceAfter * 100) / 100;
+        if (Math.abs(expected - observed) > 0.01) {
+          unreconciled.push(transaction.date + ' (expected ' + expected.toFixed(2) + ', read ' + observed.toFixed(2) + ')');
+        }
+        running = observed;
+      }
+      if (unreconciled.length) {
+        throw new Error('Local OCR read one or more transaction values inconsistently with the running balance: ' +
+          unreconciled.slice(0, 5).join('; ') + (unreconciled.length > 5 ? '; +' + (unreconciled.length - 5) + ' more' : '') +
+          '. Existing account and transaction data were not changed.');
+      }
+    }
+
 
     const text = allTextLines.join('\n');
     const leftText = leftTextLines.join('\n');
