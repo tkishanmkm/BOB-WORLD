@@ -13,7 +13,7 @@ import type { TransactionType, PayeeType, AccountDetailsType } from "@/lib/types
 import { format, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { FileDown } from 'lucide-react';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
@@ -297,8 +297,7 @@ export function TransactionReceiptDialog({
         await Filesystem.writeFile({
           path: fileName,
           data: dataUrl.split(',')[1],
-          directory: Capacitor.getPlatform() === 'android' ? Directory.Downloads : Directory.Documents,
-          encoding: Encoding.Base64,
+          directory: Directory.Documents,
           recursive: true,
         });
       } else {
