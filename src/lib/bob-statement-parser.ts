@@ -420,7 +420,7 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
           ...(balance !== undefined ? { balanceAfter: balance } : {}),
         };
         transactions.push(transaction);
-        if (ocrWorker) {
+        if (pageUsesOcr) {
           const amountCell = debitCandidate?.cell ?? creditCandidate?.cell;
           transactionOcrQuality.set(transaction.id, {
             amountConfidence: amountCell?.confidence,
@@ -455,8 +455,13 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
         let observed = Math.round(transaction.balanceAfter * 100) / 100;
         if (Math.abs(expected - observed) > 0.01) {
           const quality = transactionOcrQuality.get(transaction.id);
-          const amountConfidence = quality?.amountConfidence ?? 100;
-          const balanceConfidence = quality?.balanceConfidence ?? 0;
+          if (!quality || quality.amountConfidence === undefined || quality.balanceConfidence === undefined) {
+            unreconciled.push(transaction.date + ' (OCR confidence unavailable; manual review required)');
+            running = observed;
+            continue;
+          }
+          const amountConfidence = quality.amountConfidence;
+          const balanceConfidence = quality.balanceConfidence;
           const balanceMovement = Math.round((observed - running) * 100) / 100;
           const inferredType = balanceMovement >= 0 ? 'credit' : 'debit';
           const inferredAmount = Math.abs(balanceMovement);
