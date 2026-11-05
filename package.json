@@ -6,6 +6,7 @@
     "dev": "next dev -p 3000",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "postinstall": "node scripts/copy-pdf-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -52,6 +53,7 @@
     "genkit": "^1.8.0",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "pdfjs-dist": "^4.10.38",
     "lucide-react": "^0.475.0",
     "next": "15.4.10",
     "patch-package": "^8.0.0",
@@ -62,7 +64,9 @@
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.2.0",
