@@ -73,22 +73,22 @@ function fieldFromText(text: string, labels: string[]): string {
   const nextField = /^(?:account\s+(?:name|number|type)|branch\s+(?:name|address|city|pin)|customer\s+(?:name|id|address|city|pin)|ifsc(?:\s+code)?|micr(?:\s+code)?|ckyc(?:\s+number|\s+no)?|nominee(?:\s+name)?|statement\s+(?:of\s+account|period)|serial\s+no\.?|transaction\s+date|value\s+date|description|cheque\s+number|debit|credit|balance)\b/i;
   for (let i = 0; i < lines.length; i++) {
     for (const label of labels) {
-      const escaped = label.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\function fieldFromText(text: string, labels: string[]): string {
-  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  for (let i = 0; i < lines.length; i++) {
-    for (const label of labels) {
       const escaped = label.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
       const match = lines[i].match(new RegExp('^' + escaped + '\\s*[:\\-]?\\s*(.*)$', 'i'));
       if (!match) continue;
+      const values: string[] = [];
       const inline = (match[1] || '').trim();
-      if (inline && !/^(?:details|information)$/i.test(inline)) return inline.replace(/\s{2,}/g, ' ');
-      const next = lines[i + 1] || '';
-      if (next && !/^(account|branch|customer|statement|transaction)\s+(?:details|information)/i.test(next)) return next;
+      if (inline && !/^(?:details|information)$/i.test(inline)) values.push(inline);
+      for (let j = i + 1; j < Math.min(lines.length, i + 9); j++) {
+        if (nextField.test(lines[j]) || DATE_RE.test(lines[j])) break;
+        if (/^(?:opening|closing)\s+balance$/i.test(lines[j])) break;
+        values.push(lines[j]);
+      }
+      return values.join(' ').replace(/\s{2,}/g, ' ').trim();
     }
   }
   return '';
-}');
-      const match = lines[i].match(new RegExp('^' + escaped + '\\s*[:\\-]?\\s*(.*)
+}
 function parseStatementPeriod(text: string): { from?: string; to?: string } {
   const match = text.match(/(?:from|period\s*[:\-]?)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s+(?:to|through)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
   return { from: match ? parseDate(match[1]) || undefined : undefined, to: match ? parseDate(match[2]) || undefined : undefined };
