@@ -13,6 +13,8 @@ import type { TransactionType, PayeeType, AccountDetailsType } from "@/lib/types
 import { format, parseISO } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { FileDown } from 'lucide-react';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { STATEMENT_LOGO_KEY } from '@/lib/constants';
@@ -85,6 +87,13 @@ function toPdfImageType(dataUri: string): 'PNG' | 'JPEG' | null {
   return null;
 }
 
+const readBlobAsDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error('Could not prepare the receipt PDF for saving.'));
+  reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the receipt PDF.'));
+  reader.readAsDataURL(blob);
+});
+
 const bankIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96"><path fill="#5f6874" d="M12 2 2 7v2h20V7L12 2Zm-7 9h2v7H5v-7Zm6 0h2v7h-2v-7Zm6 0h2v7h-2v-7ZM3 20h18v2H3v-2Z"/></svg>';
 const rupeeIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" width="320" height="512"><path fill="#23282e" d="M32 32h256c17.7 0 32 14.3 32 32s-14.3 32-32 32h-56c13.4 13.8 22.8 31.9 26.5 52H288c17.7 0 32 14.3 32 32s-14.3 32-32 32h-29.5c-13.1 58.7-62.5 103-122.7 108.4l145.1 104.8c14.4 10.4 17.7 30.4 7.3 44.7-10.4 14.4-30.4 17.7-44.7 7.3l-224-162c-11.4-8.2-16.2-22.8-11.9-36.2C12 265.6 24.6 256 39 256h73c33.4 0 62.2-18.6 77.1-46H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h157.1c-14.9-27.4-43.7-46-77.1-46H32C14.3 100 0 85.7 0 68s14.3-36 32-36Z"/></svg>';
 
@@ -116,6 +125,7 @@ export function TransactionReceiptDialog({
   remitterAccountDetails,
 }: TransactionReceiptDialogProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   if (!transaction || !payee || !remitterAccountDetails) return null;
 
   const parsedDate = parseISO(transaction.date);
@@ -129,6 +139,7 @@ export function TransactionReceiptDialog({
 
   const handleDownloadPdf = async () => {
     setDownloadError(null);
+    setIsDownloading(true);
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -279,10 +290,32 @@ export function TransactionReceiptDialog({
       doc.text('This is a computer-generated transaction receipt.', pageWidth / 2, 280, { align: 'center' });
 
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
-      doc.save('BOB-World-Receipt-' + ref + '.pdf');
+      const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
+      const blob = doc.output('blob');
+      if (Capacitor.isNativePlatform()) {
+        const dataUrl = await readBlobAsDataUrl(blob);
+        await Filesystem.writeFile({
+          path: fileName,
+          data: dataUrl.split(',')[1],
+          directory: Capacitor.getPlatform() === 'android' ? Directory.Downloads : Directory.Documents,
+          encoding: Encoding.Base64,
+          recursive: true,
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
     } catch (error) {
       console.error('Receipt PDF generation failed:', error);
       setDownloadError(error instanceof Error ? error.message : 'Could not generate the receipt PDF.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -348,8 +381,8 @@ export function TransactionReceiptDialog({
           </div>
         </div>
         <DialogFooter className="p-4 border-t bg-muted/50 mt-auto gap-2 sm:justify-between">
-          <Button type="button" variant="outline" onClick={handleDownloadPdf} className="w-full sm:w-auto">
-            <FileDown className="mr-2 h-4 w-4" /> Download PDF
+          <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={isDownloading} className="w-full sm:w-auto">
+            <FileDown className="mr-2 h-4 w-4" /> {isDownloading ? "Preparing PDF..." : "Download PDF"}
           </Button>
           <DialogClose asChild>
             <Button type="button" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">Done</Button>
