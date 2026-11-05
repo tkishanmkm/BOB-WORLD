@@ -726,7 +726,10 @@ export default function SettingsPage() {
       } catch (assetError) {
         console.warn('Statement logo extraction failed after import:', assetError);
       }
-      toast({ title: "Statement imported", description: newestFirst.length + " transactions replaced the previous list. Account details and balance updated; payees and app appearance preserved." });
+      const ocrNote = parsed.ocrAdjustedTransactions
+        ? " " + parsed.ocrAdjustedTransactions + " low-confidence amount(s) were reconciled against the printed running balance."
+        : "";
+      toast({ title: "Statement imported", description: newestFirst.length + " transactions replaced the previous list. Account details and balance updated; payees and app appearance preserved." + ocrNote });
     } catch (error) {
       console.error("Local statement extraction failed:", error);
       toast({ title: "Statement extraction failed", description: error instanceof Error ? error.message : "Could not parse the statement. Existing account and transaction data were not changed.", variant: "destructive" });
