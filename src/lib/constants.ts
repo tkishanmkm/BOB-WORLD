@@ -158,6 +158,8 @@ export const PASSBOOK_TOTAL_IN_KEY = 'bobworld_passbook_total_in';
 export const PASSBOOK_TOTAL_OUT_KEY = 'bobworld_passbook_total_out';
 export const PASSBOOK_CLOSING_BALANCE_KEY = 'bobworld_passbook_closing_balance';
 export const STATEMENT_PDF_KEY = 'bobworld_statement_pdf';
+export const STATEMENT_LOGO_KEY = 'bobworld_statement_logo';
+export const STATEMENT_BANK_LOGO_KEY = 'bobworld_statement_bank_logo';
 
 // Image related keys
 export const LOGIN_BANNER_KEY = 'bobworld_image_loginBannerDataUri';
