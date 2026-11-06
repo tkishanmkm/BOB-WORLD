@@ -72,7 +72,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { format, parseISO } from 'date-fns';
-import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from '@/lib/indexed-db';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys, readAllAppState } from '@/lib/indexed-db';
 
 
 interface ImageUploaderState {
@@ -542,6 +542,14 @@ export default function SettingsPage() {
         const jsonString = e.target?.result as string;
         const importedData = JSON.parse(jsonString);
 
+        const importedAppState = importedData.appState && typeof importedData.appState === 'object' && !Array.isArray(importedData.appState)
+          ? importedData.appState as Record<string, unknown>
+          : {};
+        for (const [key, value] of Object.entries(importedAppState)) {
+          if (!key.startsWith('bobworld_')) continue;
+          localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+        }
+
         if (importedData.accountDetails) localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(importedData.accountDetails));
         if (importedData.balance !== null && importedData.balance !== undefined) localStorage.setItem(BALANCE_STORAGE_KEY, importedData.balance.toString());
         if (importedData.transactions) localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(importedData.transactions));
@@ -581,7 +589,7 @@ export default function SettingsPage() {
                 }
             }
         }
-        await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+        await persistStorageKeys(Array.from(new Set([...BOB_WORLD_STATE_KEYS, ...Object.keys(importedAppState).filter(key => key.startsWith('bobworld_'))])));
         window.location.reload();
       } catch (error) {
         console.error("Error importing application data:", error);
@@ -602,6 +610,13 @@ export default function SettingsPage() {
       const passbookTotalInData = localStorage.getItem(PASSBOOK_TOTAL_IN_KEY);
       const passbookTotalOutData = localStorage.getItem(PASSBOOK_TOTAL_OUT_KEY);
       const passbookClosingBalanceData = localStorage.getItem(PASSBOOK_CLOSING_BALANCE_KEY);
+      const indexedAppState = await readAllAppState();
+      const localAppState = Object.fromEntries(
+        Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+          .filter((key): key is string => Boolean(key && key.startsWith('bobworld_')))
+          .map(key => [key, localStorage.getItem(key)]),
+      );
+      const appState = { ...indexedAppState, ...localAppState };
       const imagesToExport: Partial<Record<ImageKeys, string | null>> = {};
       imageUploadConfig.forEach(imgConf => {
           if (imgConf.key === 'profile') {
@@ -613,6 +628,9 @@ export default function SettingsPage() {
       });
 
       const exportData = {
+        exportVersion: 2,
+        exportedAt: new Date().toISOString(),
+        appState,
         accountDetails: accountDetailsData ? JSON.parse(accountDetailsData) : null,
         balance: balanceData ? parseFloat(balanceData) : null,
         transactions: transactionsData ? JSON.parse(transactionsData) : [],
