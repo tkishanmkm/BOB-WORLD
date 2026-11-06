@@ -25,6 +25,9 @@ import {
   INITIAL_ACCOUNT_DETAILS,
   INITIAL_BALANCE,
   INITIAL_TRANSACTIONS,
+  PASSBOOK_TOTAL_IN_KEY,
+  PASSBOOK_TOTAL_OUT_KEY,
+  PASSBOOK_CLOSING_BALANCE_KEY,
   TPIN_HASH_STORAGE_KEY,
   TRANSACTIONS_STORAGE_KEY,
 } from '@/lib/constants';
@@ -243,15 +246,33 @@ export function TransferFlowDialog({
       const nextTransactions = [chargeTransaction, transferTransaction, ...previousTransactions]
         .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
       const previousBalanceValue = localStorage.getItem(BALANCE_STORAGE_KEY);
+      const previousTotalIn = localStorage.getItem(PASSBOOK_TOTAL_IN_KEY);
+      const previousTotalOut = localStorage.getItem(PASSBOOK_TOTAL_OUT_KEY);
+      const previousClosingBalance = localStorage.getItem(PASSBOOK_CLOSING_BALANCE_KEY);
+      const totalIn = Math.round(nextTransactions
+        .filter(tx => tx.type === 'credit')
+        .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0) * 100) / 100;
+      const totalOut = Math.round(nextTransactions
+        .filter(tx => tx.type === 'debit')
+        .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0) * 100) / 100;
       try {
         localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(nextTransactions));
         localStorage.setItem(BALANCE_STORAGE_KEY, String(afterCharge));
+        localStorage.setItem(PASSBOOK_TOTAL_IN_KEY, String(totalIn));
+        localStorage.setItem(PASSBOOK_TOTAL_OUT_KEY, String(totalOut));
+        localStorage.setItem(PASSBOOK_CLOSING_BALANCE_KEY, String(afterCharge));
         await persistStorageKeys(BOB_WORLD_STATE_KEYS);
       } catch (storageError) {
         if (storedTransactions === null) localStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
         else localStorage.setItem(TRANSACTIONS_STORAGE_KEY, storedTransactions);
         if (previousBalanceValue === null) localStorage.removeItem(BALANCE_STORAGE_KEY);
         else localStorage.setItem(BALANCE_STORAGE_KEY, previousBalanceValue);
+        if (previousTotalIn === null) localStorage.removeItem(PASSBOOK_TOTAL_IN_KEY);
+        else localStorage.setItem(PASSBOOK_TOTAL_IN_KEY, previousTotalIn);
+        if (previousTotalOut === null) localStorage.removeItem(PASSBOOK_TOTAL_OUT_KEY);
+        else localStorage.setItem(PASSBOOK_TOTAL_OUT_KEY, previousTotalOut);
+        if (previousClosingBalance === null) localStorage.removeItem(PASSBOOK_CLOSING_BALANCE_KEY);
+        else localStorage.setItem(PASSBOOK_CLOSING_BALANCE_KEY, previousClosingBalance);
         throw storageError;
       }
 
