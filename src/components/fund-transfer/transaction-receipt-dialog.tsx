@@ -155,6 +155,21 @@ export function TransactionReceiptDialog({
       const margin = 18;
       const right = pageWidth - margin;
       const contentWidth = pageWidth - margin * 2;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFillColor(247, 248, 250);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      doc.setFillColor(255, 96, 72);
+      doc.rect(0, 0, pageWidth, 78, 'F');
+      const ticketX = 12;
+      const ticketY = 43;
+      const ticketWidth = pageWidth - 24;
+      const ticketHeight = 207;
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(ticketX, ticketY, ticketWidth, ticketHeight, 2.5, 2.5, 'F');
+      doc.setFillColor(255, 96, 72);
+      for (let x = ticketX + 4; x < ticketX + ticketWidth - 2; x += 8) doc.circle(x, ticketY, 2.25, 'F');
+      doc.setFillColor(247, 248, 250);
+      for (let x = ticketX + 4; x < ticketX + ticketWidth - 2; x += 8) doc.circle(x, ticketY + ticketHeight, 2.25, 'F');
       let y = 14;
 
       const defaults = await ensureStatementBrandAssets();
@@ -184,10 +199,17 @@ export function TransactionReceiptDialog({
         y += 20;
       }
 
+      doc.setFillColor(32, 178, 145);
+      doc.circle(pageWidth / 2, y + 3.5, 5.5, 'F');
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(1.1);
+      doc.line(pageWidth / 2 - 2.2, y + 3.5, pageWidth / 2 - 0.5, y + 5.2);
+      doc.line(pageWidth / 2 - 0.5, y + 5.2, pageWidth / 2 + 2.7, y + 1.8);
+      y += 12;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(18);
       doc.setTextColor(32, 55, 83);
-      doc.text('Transaction Receipt', pageWidth / 2, y + 4, { align: 'center' });
+      doc.text('Transfer record saved', pageWidth / 2, y + 4, { align: 'center' });
       y += 10;
 
       doc.setFont('helvetica', 'normal');
