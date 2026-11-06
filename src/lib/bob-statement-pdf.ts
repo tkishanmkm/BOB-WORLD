@@ -413,6 +413,12 @@ function drawFooter(
   doc.setFontSize(6.3);
   doc.setTextColor(35, 35, 35);
   doc.text('Page ' + pageNumber + ' of ' + totalPages, PAGE_WIDTH / 2, 281.2, { align: 'center' });
+  if (pageNumber === 1) {
+    doc.setFont('LiberationSans', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(90, 90, 90);
+    doc.text('APP-GENERATED COPY', 7.0, 293.5);
+  }
 
   doc.addImage(
     bottomGradient,
