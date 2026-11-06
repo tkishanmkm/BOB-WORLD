@@ -306,10 +306,10 @@ export function TransactionReceiptDialog({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.2);
       doc.setTextColor(80, 83, 88);
-      doc.text('PERSONAL RECORD - NOT ISSUED OR VERIFIED BY THE BANK', pageWidth / 2, 275.5, { align: 'center' });
+      doc.text('PERSONAL RECORD - NOT ISSUED BY THE BANK', pageWidth / 2, 275.5, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.text('This app records locally; no bank network was contacted.', pageWidth / 2, 280, { align: 'center' });
+      doc.text('Generated locally from information saved in this app.', pageWidth / 2, 280, { align: 'center' });
 
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
