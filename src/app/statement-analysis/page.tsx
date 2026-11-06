@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { generateStatementSummary } from '@/ai/flows/statement-summary';
 import { AnalysisDisplay } from '@/components/statement-analysis/analysis-display';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -33,12 +32,25 @@ export default function StatementAnalysisPage() {
     setSummary(null);
 
     try {
-      const result = await generateStatementSummary({ statementText });
-      if (result && result.summary) {
-        setSummary(result.summary);
-      } else {
-        throw new Error("Received an empty summary from the AI.");
-      }
+      // Local-only text review keeps pasted account data on this device.
+      const lines = statementText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const dateMatches = statementText.match(/\b\d{2}[/-]\d{2}[/-]\d{4}\b/g) || [];
+      const amounts = Array.from(statementText.matchAll(/(?:₹|INR\s*)\s*([0-9,]+(?:\.\d{1,2})?)/gi))
+        .map(match => Number(match[1].replace(/,/g, '')))
+        .filter(value => Number.isFinite(value));
+      const references = (statementText.match(/\b(?:UPI|IMPS|NEFT|RTGS)\b/gi) || []).length;
+      const largest = amounts.length ? Math.max(...amounts) : null;
+      const smallest = amounts.length ? Math.min(...amounts) : null;
+      setSummary([
+        'Local text review completed.',
+        'Non-empty lines: ' + lines.length,
+        'Date strings found: ' + dateMatches.length,
+        'Rupee amounts found: ' + amounts.length,
+        'Payment-channel keywords found: ' + references,
+        'Largest amount string: ' + (largest === null ? 'Not detected' : '₹' + largest.toLocaleString('en-IN', { maximumFractionDigits: 2 })),
+        'Smallest amount string: ' + (smallest === null ? 'Not detected' : '₹' + smallest.toLocaleString('en-IN', { maximumFractionDigits: 2 })),
+        'This text scan does not verify account balances or certify transaction accuracy.',
+      ].join('\n'));
     } catch (e: any) {
       console.error("Statement analysis failed:", e);
       setError("Failed to analyze the statement. Please check the console for details or try again later.");
@@ -60,7 +72,7 @@ export default function StatementAnalysisPage() {
             <ArrowLeft className="h-6 w-6" />
           </Button>
         </Link>
-        <h1 className="text-lg font-semibold text-foreground">AI Statement Analysis</h1>
+        <h1 className="text-lg font-semibold text-foreground">Statement Analysis</h1>
         <div className="w-10"></div>
       </header>
 
@@ -68,7 +80,7 @@ export default function StatementAnalysisPage() {
         <CardHeader>
           <CardTitle>Analyze Your Statement</CardTitle>
           <CardDescription>
-            Paste your bank statement text below to get an AI-powered summary, highlighting key transactions and insights.
+            Paste statement text for a local review. The text stays in this browser and is not uploaded.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,7 +98,7 @@ export default function StatementAnalysisPage() {
         </CardContent>
          <CardFooter>
           <Button onClick={handleAnalyze} disabled={isLoading || !statementText.trim()} className="w-full sm:w-auto">
-            {isLoading ? "Analyzing..." : "Generate Summary"}
+            {isLoading ? "Analyzing..." : "Review Text"}
           </Button>
         </CardFooter>
       </Card>

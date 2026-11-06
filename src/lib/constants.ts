@@ -36,7 +36,7 @@ export const INITIAL_ACCOUNT_DETAILS: AccountDetailsType = {
   ifscCode: 'FINO0009001',
   customerId: '274839201',
   profileImageUrl: undefined,
-  lastLogin: format(new Date(), 'MMM dd, yyyy hh:mm a'),
+  lastLogin: new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata', timeZoneName: 'short' }).format(new Date()),
   dob: '15/07/1995',
   panNumber: 'FGHIJ5678K',
   branchName: 'Mindspace Juinagar Plot No Gen 2/1/F',
@@ -115,7 +115,7 @@ const transactionsBase: TransactionType[] = [
   { id: 'tx011', date: createISODateWithRandomTime('2025-05-07'), description: 'Movie Tickets - PVR Cinemas', amount: 832, type: 'debit', instrumentNumber: "NA", transactionMainType: "Card Payment", transactionSubType: "Entertainment" },
   { id: 'tx012', date: createISODateWithRandomTime('2025-05-08'), description: 'Flight Tickets - Indigo to Delhi', amount: 27390, type: 'debit', instrumentNumber: "NA", transactionMainType: "Online Purchase", transactionSubType: "Travel" },
   { id: 'tx013', date: createISODateWithRandomTime('2025-05-08'), description: 'Mutual Fund Investment - SIP', amount: 10000, type: 'debit', instrumentNumber: "NA", transactionMainType: "Investment", transactionSubType: "SIP" },
-  { id: 'tx014', date: createISODateWithRandomTime('2025-05-09'), description: 'Weekend Shopping Spree - Myntra', amount: 26281, type: 'debit', comments: 'This is a final spending for demo', instrumentNumber: "NA", transactionMainType: "Online Purchase", transactionSubType: "Shopping" },
+  { id: 'tx014', date: createISODateWithRandomTime('2025-05-09'), description: 'Weekend Shopping Spree - Myntra', amount: 26281, type: 'debit', comments: 'This is a final spending record', instrumentNumber: "NA", transactionMainType: "Online Purchase", transactionSubType: "Shopping" },
   { id: 'tx015', date: createISODateWithRandomTime('2025-05-09'), description: 'Interest Credit', amount: 550, type: 'credit', comments: 'Quarterly interest', instrumentNumber: "NA", transactionMainType: "Interest", transactionSubType: "Bank Credit" },
 ];
 
@@ -157,7 +157,10 @@ export const LIVE_AGENT_MESSAGES_STORAGE_KEY = 'bobworld_live_agent_messages';
 export const PASSBOOK_TOTAL_IN_KEY = 'bobworld_passbook_total_in';
 export const PASSBOOK_TOTAL_OUT_KEY = 'bobworld_passbook_total_out';
 export const PASSBOOK_CLOSING_BALANCE_KEY = 'bobworld_passbook_closing_balance';
+export const TPIN_HASH_STORAGE_KEY = 'bobworld_transfer_tpin_verifier';
 export const STATEMENT_PDF_KEY = 'bobworld_statement_pdf';
+export const STATEMENT_LOGO_KEY = 'bobworld_statement_logo';
+export const STATEMENT_BANK_LOGO_KEY = 'bobworld_statement_bank_logo';
 
 // Image related keys
 export const LOGIN_BANNER_KEY = 'bobworld_image_loginBannerDataUri';

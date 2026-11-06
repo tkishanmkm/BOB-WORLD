@@ -32,15 +32,17 @@ import {
   PASSBOOK_TOTAL_IN_KEY,
   PASSBOOK_TOTAL_OUT_KEY,
   PASSBOOK_CLOSING_BALANCE_KEY,
-  STATEMENT_PDF_KEY,
+  STATEMENT_LOGO_KEY,
+  STATEMENT_BANK_LOGO_KEY,
 } from "@/lib/constants";
 import type { TransactionType, AccountDetailsType, PayeeType } from '@/lib/types'; 
 import { ArrowLeft, MoreHorizontal, CalendarDays, ChevronDown, RefreshCw, FileDown, SlidersHorizontal, IndianRupee, Loader2 } from "lucide-react";
 import Link from 'next/link';
 import { format, subDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Capacitor } from '@capacitor/core';
+import { generateBobStatementPdf } from '@/lib/bob-statement-pdf';
+import { ensureStatementBrandAssets, saveStatementPdfAndAssets } from '@/lib/statement-download';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 
 
 export default function PassbookPage() {
@@ -64,6 +66,9 @@ export default function PassbookPage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+      if (cancelled) return;
     const storedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
     if (storedTransactions) {
       try {
@@ -125,72 +130,63 @@ export default function PassbookPage() {
 
     const storedOverrideClosingBalance = localStorage.getItem(PASSBOOK_CLOSING_BALANCE_KEY);
     if (storedOverrideClosingBalance) setOverrideClosingBalance(parseFloat(storedOverrideClosingBalance));
-
+    }).catch(error => console.error('Could not restore passbook data from IndexedDB:', error));
+    return () => { cancelled = true; };
   }, []);
 
   const handleDownload = async () => {
+    if (!fromDate || !toDate || fromDate > toDate) {
+      toast({
+        title: "Choose a valid date range",
+        description: "Select a From date and To date before downloading the statement.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!accountDetails.accountNumber?.trim()) {
+      toast({
+        title: "Account number missing",
+        description: "Add the account number in Settings before generating a statement.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsDownloading(true);
-
     try {
-      const statementPdfDataUri = localStorage.getItem(STATEMENT_PDF_KEY);
-      if (!statementPdfDataUri || !statementPdfDataUri.startsWith('data:application/pdf;base64,')) {
-         toast({
-          title: "Download Failed",
-          description: "No statement PDF found. Please upload one in the Settings page.",
-          variant: "destructive",
-        });
-        setIsDownloading(false);
-        return;
-      }
-      
-      const dateStr = format(new Date(), 'yyyyMMdd');
-      const fileName = `XXXXXXXXXX${accountDetails.accountNumber.slice(-4)}_${dateStr}.pdf`;
-
-      if (Capacitor.getPlatform() === 'android') {
-        const base64Data = statementPdfDataUri.split(',')[1];
-        await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: Directory.Downloads,
-        });
-        toast({
-          title: "Download Complete",
-          description: `${fileName} saved to Downloads folder.`,
-        });
-
-      } else {
-        // Web fallback
-        const byteString = atob(statementPdfDataUri.split(',')[1]);
-        const mimeString = statementPdfDataUri.split(',')[0].split(':')[1].split(';')[0];
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-        }
-        const blob = new Blob([ab], { type: mimeString });
-        const url = URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        
-        document.body.appendChild(link);
-        link.click();
-        
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-         toast({
-          title: "Download Successful",
-          description: "Statement has been downloaded.",
-        });
-      }
-
-    } catch (error: any) {
-      console.error("Error during download:", error);
-       toast({
-        title: "Download Error",
-        description: error.message || "An unexpected error occurred. Ensure Filesystem plugin is synced.",
+      const defaults = await ensureStatementBrandAssets();
+      const bobWorldLogo = localStorage.getItem(STATEMENT_LOGO_KEY) || defaults.bobWorldLogo;
+      const bankLogo = localStorage.getItem(STATEMENT_BANK_LOGO_KEY) || defaults.bankLogo;
+      const pdfBlob = await generateBobStatementPdf({
+        account: accountDetails,
+        transactions: allTransactions,
+        currentBalance,
+        from: fromDate,
+        to: toDate,
+        bobWorldLogo,
+        bankLogo,
+      });
+      const lastFour = accountDetails.accountNumber.replace(/\D/g, '').slice(-4) || 'XXXX';
+      const fileName = 'BOBWORLD_STMT_XX' + lastFour + '_' + format(new Date(), 'ddMMyyyy') + '.pdf';
+      const savedLocation = await saveStatementPdfAndAssets(pdfBlob, fileName, {
+        bobWorldLogo,
+        bankLogo,
+      });
+      const shareSheetOpened = savedLocation.includes('share sheet');
+      const shareSheetCancelled = savedLocation === 'Share sheet closed without saving';
+      toast({
+        title: shareSheetCancelled ? 'Statement not saved' : shareSheetOpened ? 'Save statement to Files' : 'Statement downloaded',
+        description: shareSheetOpened
+          ? fileName + ' and its logo assets are ready in the share sheet. Choose Save to Files.'
+          : shareSheetCancelled
+            ? 'The share sheet was closed before a file was saved.'
+            : fileName + ' saved to ' + savedLocation + '.',
+      });
+    } catch (error) {
+      console.error("Statement PDF download failed:", error);
+      toast({
+        title: "Statement download failed",
+        description: error instanceof Error ? error.message : "The statement could not be generated or saved.",
         variant: "destructive",
       });
     } finally {
@@ -367,7 +363,14 @@ export default function PassbookPage() {
             </p>
             <div className="flex items-center space-x-1">
               <Button variant="ghost" size="icon"><RefreshCw className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" onClick={handleDownload} disabled={isDownloading}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                title="Download account statement PDF"
+                aria-label="Download account statement PDF"
+              >
                 {isDownloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
               </Button>
                <DropdownMenu>

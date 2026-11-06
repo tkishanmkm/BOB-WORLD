@@ -19,6 +19,7 @@ import type { AccountDetailsType } from '@/lib/types';
 import { ChevronDown, Lock, QrCode, Eye, MoreHorizontal, Smartphone, CreditCard, Send, HelpCircle, ScanFace, Dot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/layout/splash-screen';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from '@/lib/indexed-db';
 
 const PinInputCircle: React.FC<{ value: string }> = ({ value }) => (
   <div className={cn(
@@ -40,6 +41,9 @@ export default function LoginPage() {
 
 
   useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+    if (cancelled) return;
     const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
     if (storedDetails) {
       try {
@@ -66,9 +70,9 @@ export default function LoginPage() {
       setLoginBanners(['https://placehold.co/600x200.png?text=Banner+1']);
     }
 
-     if (inputRefs.current[0]) {
-      inputRefs.current[0]?.focus();
-    }
+     if (inputRefs.current[0]) inputRefs.current[0]?.focus();
+    }).catch(error => console.error('Could not restore local app data:', error));
+    return () => { cancelled = true; };
   }, []);
   
   useEffect(() => {
@@ -103,7 +107,23 @@ export default function LoginPage() {
     }
 
     if (newPin.every(digit => digit !== '') && newPin.join('').length === 4) {
-      console.log("Attempting login with PIN:", newPin.join(''));
+      const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+      let details: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS };
+      try {
+        if (storedDetails) details = { ...details, ...JSON.parse(storedDetails) };
+      } catch (error) {
+        console.error('Could not read account details while recording login:', error);
+      }
+      details.lastLogin = new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: true, timeZone: 'Asia/Kolkata', timeZoneName: 'short',
+      }).format(new Date());
+      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(details));
+      void persistStorageKeys(BOB_WORLD_STATE_KEYS).catch(error =>
+        console.error('Could not persist login timestamp to IndexedDB:', error)
+      );
+      setAccountDetails(details);
       router.push('/dashboard');
     }
   };
@@ -199,7 +219,7 @@ export default function LoginPage() {
             {pin.map((digit, index) => (
               <div key={index} className="relative">
                 <Input
-                  ref={el => inputRefs.current[index] = el}
+                  ref={el => { inputRefs.current[index] = el; }}
                   type="password"
                   inputMode="numeric"
                   pattern="[0-9]*"

@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'; // Assuming you use Heroicons
+import { Pencil, Trash2, Plus } from 'lucide-react';
 // import { useChatSettings } from '@/context/chat-settings-context'; // Keep if needed for other settings (remove if no other settings exist)
 
 const ChatSettings: React.FC = () => {
@@ -45,12 +45,6 @@ const ChatSettings: React.FC = () => {
     // Add logic to edit chat
   };
 
-  const handleAddChat = () => {
-    console.log('Adding new chat');
-    // Add logic to add new chat
-    // Add logic to delete chat
-  };
-
   // Remove these toggles
   // const handleToggleEditing = (checked: boolean) => {
   //   setSettings((prevSettings) => ({
@@ -82,10 +76,10 @@ const ChatSettings: React.FC = () => {
  <h3 className="font-medium">Chat {chat.id}</h3>
  <div className="flex space-x-2">
  <Button variant="outline" size="sm" onClick={() => handleEditChat(chat.id)}>
- <PencilIcon className="h-4 w-4" />
+ <Pencil className="h-4 w-4" />
  </Button>
  <Button variant="outline" size="sm" onClick={() => handleDeleteChat(chat.id)}>
- <TrashIcon className="h-4 w-4 text-red-500" />
+ <Trash2 className="h-4 w-4 text-red-500" />
  </Button>
  </div>
  </div>
@@ -102,7 +96,7 @@ const ChatSettings: React.FC = () => {
  </div>
  <div className="mt-4">
  <Button onClick={handleAddChat}>
- <PlusIcon className="h-4 w-4 mr-2" /> Add New Chat
+ <Plus className="h-4 w-4 mr-2" /> Add New Chat
  </Button>
  </div>
  </CardContent>

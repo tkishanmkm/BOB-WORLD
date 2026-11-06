@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { AccountDetailsType } from '@/lib/types';
 import { INITIAL_ACCOUNT_DETAILS } from '@/lib/constants';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 
 const ACCOUNT_DETAILS_STORAGE_KEY = 'bobworld_account_details';
 
@@ -63,6 +64,9 @@ export default function ProfilePage() {
   const router = useRouter(); // Initialize router
 
   useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+    if (cancelled) return;
     let details: AccountDetailsType = INITIAL_ACCOUNT_DETAILS;
     const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
     if (storedDetails) {
@@ -72,19 +76,10 @@ export default function ProfilePage() {
         console.error("Failed to parse account details from localStorage:", e);
       }
     }
-    // Always update lastLogin to the current time on profile view, formatted for IST.
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-US', { // en-US gives MMM dd, yyyy format
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: true,
-        timeZone: 'Asia/Kolkata'
-    });
-    details.lastLogin = formatter.format(now);
+    // Last login is recorded on successful PIN submission, not when Profile is opened.
     setAccountDetails(details);
+    }).catch(error => console.error('Could not restore profile details from IndexedDB:', error));
+    return () => { cancelled = true; };
   }, []);
 
   const initials = accountDetails.name

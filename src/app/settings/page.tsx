@@ -32,15 +32,19 @@ import {
   PAYEES_STORAGE_KEY,
   INITIAL_LIVE_AGENT_MESSAGES,
   LIVE_AGENT_MESSAGES_STORAGE_KEY,
-  STATEMENT_PDF_KEY,
+  STATEMENT_LOGO_KEY,
+  STATEMENT_BANK_LOGO_KEY,
+  TPIN_HASH_STORAGE_KEY,
 } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText } from 'lucide-react';
+import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText, ShieldCheck } from 'lucide-react';
 import { AddTransactionDialog } from "@/components/passbook/add-transaction-dialog";
 import { AddPayeeDialog } from "@/components/fund-transfer/add-payee-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { extractTransactionsFromPdf, type ExtractedTransaction } from '@/ai/flows/extract-transactions-from-pdf-flow';
+import { parseBobStatementPdf, extractStatementBrandAssets, type StatementBrandAssets } from '@/lib/bob-statement-parser';
+import { ensureStatementBrandAssets } from '@/lib/statement-download';
+import { createTpinVerifier } from '@/lib/tpin-security';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +72,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { format, parseISO } from 'date-fns';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from '@/lib/indexed-db';
 
 
 interface ImageUploaderState {
@@ -87,7 +92,9 @@ type ImageKeys =
   | 'rdBanner' 
   | 'debitCardIllustration' 
   | 'linkBankIllustration' 
-  | 'promoWomanPayment';
+  | 'promoWomanPayment'
+  | 'statementLogo'
+  | 'statementBankLogo';
 
 
 export default function SettingsPage() {
@@ -98,6 +105,10 @@ export default function SettingsPage() {
   const [liveAgentMessages, setLiveAgentMessages] = useState<LiveAgentMessageType[]>(INITIAL_LIVE_AGENT_MESSAGES);
   
   const [statementPdfName, setStatementPdfName] = useState<string | null>(null);
+  const [transferTpin, setTransferTpin] = useState('');
+  const [confirmTransferTpin, setConfirmTransferTpin] = useState('');
+  const [isTransferTpinConfigured, setIsTransferTpinConfigured] = useState(false);
+  const [isSavingTransferTpin, setIsSavingTransferTpin] = useState(false);
 
   const [isPayeeDialogOpen, setIsPayeeDialogOpen] = useState(false);
   const [editingPayee, setEditingPayee] = useState<PayeeType | null>(null);
@@ -138,6 +149,8 @@ export default function SettingsPage() {
     debitCardIllustration: { dataUri: null, preview: 'https://placehold.co/200x120.png', defaultHint: 'debit card illustration' },
     linkBankIllustration: { dataUri: null, preview: 'https://placehold.co/120x100.png', defaultHint: 'mobile banking app' },
     promoWomanPayment: { dataUri: null, preview: 'https://placehold.co/150x100.png', defaultHint: 'woman phone payment' },
+    statementLogo: { dataUri: null, preview: 'https://placehold.co/220x90.png?text=BOB+World+Logo', defaultHint: 'BOB World logo' },
+    statementBankLogo: { dataUri: null, preview: 'https://placehold.co/220x90.png?text=Bank+Logo', defaultHint: 'Bank of Baroda wordmark' },
   });
 
   const [clientRenderedTransactions, setClientRenderedTransactions] = useState<Array<TransactionType & { formattedDate: string }>>([]);
@@ -145,11 +158,40 @@ export default function SettingsPage() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+      if (cancelled) return;
+      setIsClient(true);
+      setIsTransferTpinConfigured(Boolean(localStorage.getItem(TPIN_HASH_STORAGE_KEY)));
+    }).catch(error => console.error('Could not restore Settings state from IndexedDB:', error));
+    return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => ensureStatementBrandAssets()).then(assets => {
+      if (cancelled) return;
+      setImageStates(previous => ({
+        ...previous,
+        statementLogo: {
+          ...previous.statementLogo,
+          dataUri: assets.bobWorldLogo || previous.statementLogo.dataUri,
+          preview: assets.bobWorldLogo || previous.statementLogo.preview,
+        },
+        statementBankLogo: {
+          ...previous.statementBankLogo,
+          dataUri: assets.bankLogo || previous.statementBankLogo.dataUri,
+          preview: assets.bankLogo || previous.statementBankLogo.preview,
+        },
+      }));
+    }).catch(error => console.warn('Default statement branding could not be loaded:', error));
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+    if (cancelled) return;
     let activeAccountDetails: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS };
     const storedDetailsString = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
     if (storedDetailsString) {
@@ -231,10 +273,6 @@ export default function SettingsPage() {
     const storedPassbookClosingBalance = localStorage.getItem(PASSBOOK_CLOSING_BALANCE_KEY);
     if (storedPassbookClosingBalance) setPassbookClosingBalance(storedPassbookClosingBalance);
 
-    const storedStatementPdf = localStorage.getItem(STATEMENT_PDF_KEY);
-    if (storedStatementPdf) setStatementPdfName('statement.pdf');
-
-
     const imagesToLoadConfig: Array<{key: ImageKeys, storageKey: string, defaultPreview?: string}> = [
         { key: 'loginBanner1', storageKey: LOGIN_BANNER_KEY_1, defaultPreview: 'https://placehold.co/600x200.png' },
         { key: 'loginBanner2', storageKey: LOGIN_BANNER_KEY_2, defaultPreview: 'https://placehold.co/600x200.png' },
@@ -246,6 +284,8 @@ export default function SettingsPage() {
         { key: 'debitCardIllustration', storageKey: DEBIT_CARD_ILLUSTRATION_KEY, defaultPreview: 'https://placehold.co/200x120.png' },
         { key: 'linkBankIllustration', storageKey: LINK_BANK_ILLUSTRATION_KEY, defaultPreview: 'https://placehold.co/120x100.png' },
         { key: 'promoWomanPayment', storageKey: PROMO_WOMAN_PAYMENT_KEY, defaultPreview: 'https://placehold.co/150x100.png' },
+        { key: 'statementLogo', storageKey: STATEMENT_LOGO_KEY, defaultPreview: 'https://placehold.co/220x90.png?text=BOB+World+Logo' },
+        { key: 'statementBankLogo', storageKey: STATEMENT_BANK_LOGO_KEY, defaultPreview: 'https://placehold.co/220x90.png?text=Bank+Logo' },
     ];
 
     setImageStates(prevImages => {
@@ -264,6 +304,8 @@ export default function SettingsPage() {
         });
         return newImageStates;
     });
+    }).catch(error => console.error('Could not load Settings state:', error));
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -296,6 +338,32 @@ export default function SettingsPage() {
     setAccountDetails(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSaveTransferTpin = async () => {
+    if (!/^\d{4}$/.test(transferTpin)) {
+      toast({ title: 'Invalid TPIN', description: 'Enter exactly four digits.', variant: 'destructive' });
+      return;
+    }
+    if (transferTpin !== confirmTransferTpin) {
+      toast({ title: 'TPIN mismatch', description: 'The two TPIN entries do not match.', variant: 'destructive' });
+      return;
+    }
+    setIsSavingTransferTpin(true);
+    try {
+      const verifier = await createTpinVerifier(transferTpin);
+      localStorage.setItem(TPIN_HASH_STORAGE_KEY, JSON.stringify(verifier));
+      await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+      setIsTransferTpinConfigured(true);
+      setTransferTpin('');
+      setConfirmTransferTpin('');
+      toast({ title: 'Transfer TPIN saved', description: 'Your TPIN verifier is stored locally. The four-digit TPIN itself is not stored.' });
+    } catch (error) {
+      console.error('Could not save transfer TPIN:', error);
+      toast({ title: 'TPIN could not be saved', description: 'Secure local cryptography is unavailable on this device.', variant: 'destructive' });
+    } finally {
+      setIsSavingTransferTpin(false);
+    }
+  };
+
   const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
      if (value === "" || /^\d*\.?\d*$/.test(value)) {
@@ -326,24 +394,46 @@ export default function SettingsPage() {
     event.target.value = ''; 
   };
   
-  const handleStatementPdfUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStatementPdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({ title: "Invalid File Type", description: "Please select a PDF file.", variant: "destructive" });
-        if (event.target) event.target.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUri = reader.result as string;
-        localStorage.setItem(STATEMENT_PDF_KEY, dataUri);
-        setStatementPdfName(file.name);
-        toast({ title: "Statement PDF Uploaded", description: `${file.name} has been saved.` });
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.type !== "application/pdf" || file.size > 20 * 1024 * 1024) {
+      toast({ title: "Invalid Statement PDF", description: "Select a PDF file smaller than 20 MB.", variant: "destructive" });
+      event.target.value = '';
+      return;
     }
-    event.target.value = '';
+    try {
+      const pdfBytes = new Uint8Array(await file.arrayBuffer());
+      const assets = await extractStatementBrandAssets(pdfBytes);
+      let extracted = 0;
+      if (assets.bobWorldLogo) {
+        localStorage.setItem(STATEMENT_LOGO_KEY, assets.bobWorldLogo);
+        setImageStates(prev => ({ ...prev, statementLogo: { ...prev.statementLogo, dataUri: assets.bobWorldLogo!, preview: assets.bobWorldLogo! } }));
+        extracted += 1;
+      }
+      if (assets.bankLogo) {
+        localStorage.setItem(STATEMENT_BANK_LOGO_KEY, assets.bankLogo);
+        setImageStates(prev => ({ ...prev, statementBankLogo: { ...prev.statementBankLogo, dataUri: assets.bankLogo!, preview: assets.bankLogo! } }));
+        extracted += 1;
+      }
+      if (extracted) await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+      setStatementPdfName(file.name);
+      toast({
+        title: extracted ? "Statement artwork extracted" : "No statement logos detected",
+        description: extracted
+          ? file.name + " was inspected locally and " + extracted + " logo asset(s) were saved to Settings."
+          : "Upload the BOB World logo manually in Manage Application Images.",
+        variant: extracted ? "default" : "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Statement asset extraction failed",
+        description: error instanceof Error ? error.message : "The PDF images could not be extracted.",
+        variant: "destructive",
+      });
+    } finally {
+      event.target.value = '';
+    }
   };
 
   const imageUploadConfig: Array<{ label: string, key: ImageKeys, defaultHint: string, storageKey: string }> = [
@@ -358,6 +448,8 @@ export default function SettingsPage() {
     { label: "Debit Card Illustration (Account Actions)", key: 'debitCardIllustration', defaultHint: imageStates.debitCardIllustration.defaultHint, storageKey: DEBIT_CARD_ILLUSTRATION_KEY },
     { label: "Link Bank Illustration (Current Account Details)", key: 'linkBankIllustration', defaultHint: imageStates.linkBankIllustration.defaultHint, storageKey: LINK_BANK_ILLUSTRATION_KEY },
     { label: "Promo Banner Image (Current Account Details)", key: 'promoWomanPayment', defaultHint: imageStates.promoWomanPayment.defaultHint, storageKey: PROMO_WOMAN_PAYMENT_KEY },
+    { label: "BOB World Logo (Statement and Receipt PDFs)", key: 'statementLogo', defaultHint: imageStates.statementLogo.defaultHint, storageKey: STATEMENT_LOGO_KEY },
+    { label: "Bank Logo (Statement PDF)", key: 'statementBankLogo', defaultHint: imageStates.statementBankLogo.defaultHint, storageKey: STATEMENT_BANK_LOGO_KEY },
   ];
 
   const clearImage = (key: ImageKeys) => {
@@ -373,7 +465,7 @@ export default function SettingsPage() {
   };
 
 
-  const handleSaveChanges = (e: FormEvent) => {
+  const handleSaveChanges = async (e: FormEvent) => {
     e.preventDefault();
     
     const accountDetailsToSave: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS, ...accountDetails };
@@ -424,6 +516,14 @@ export default function SettingsPage() {
         }
     });
 
+    try {
+      await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+    } catch (error) {
+      console.error('IndexedDB snapshot save failed:', error);
+      toast({ title: 'Settings saved with local fallback', description: 'IndexedDB could not be updated. Keep a JSON export before clearing browser data.', variant: 'destructive' });
+      return;
+    }
+
     toast({
       title: "Settings Saved!",
       description: "Your configurations have been updated.",
@@ -447,7 +547,6 @@ export default function SettingsPage() {
         if (importedData.transactions) localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(importedData.transactions));
         if (importedData.payees) localStorage.setItem(PAYEES_STORAGE_KEY, JSON.stringify(importedData.payees));
         if (importedData.liveAgentMessages) localStorage.setItem(LIVE_AGENT_MESSAGES_STORAGE_KEY, JSON.stringify(importedData.liveAgentMessages));
-        if (importedData.statementPdf) localStorage.setItem(STATEMENT_PDF_KEY, importedData.statementPdf);
         
         if (importedData.passbookTotalIn) localStorage.setItem(PASSBOOK_TOTAL_IN_KEY, importedData.passbookTotalIn);
         else localStorage.removeItem(PASSBOOK_TOTAL_IN_KEY);
@@ -469,6 +568,8 @@ export default function SettingsPage() {
             debitCardIllustration: DEBIT_CARD_ILLUSTRATION_KEY,
             linkBankIllustration: LINK_BANK_ILLUSTRATION_KEY,
             promoWomanPayment: PROMO_WOMAN_PAYMENT_KEY,
+             statementLogo: STATEMENT_LOGO_KEY,
+             statementBankLogo: STATEMENT_BANK_LOGO_KEY,
         };
 
         if (importedData.images) {
@@ -499,8 +600,6 @@ export default function SettingsPage() {
       const passbookTotalInData = localStorage.getItem(PASSBOOK_TOTAL_IN_KEY);
       const passbookTotalOutData = localStorage.getItem(PASSBOOK_TOTAL_OUT_KEY);
       const passbookClosingBalanceData = localStorage.getItem(PASSBOOK_CLOSING_BALANCE_KEY);
-      const statementPdfData = localStorage.getItem(STATEMENT_PDF_KEY);
-
       const imagesToExport: Partial<Record<ImageKeys, string | null>> = {};
       imageUploadConfig.forEach(imgConf => {
           if (imgConf.key === 'profile') {
@@ -520,7 +619,6 @@ export default function SettingsPage() {
         passbookTotalIn: passbookTotalInData,
         passbookTotalOut: passbookTotalOutData,
         passbookClosingBalance: passbookClosingBalanceData,
-        statementPdf: statementPdfData,
         images: imagesToExport, 
       };
 
@@ -639,107 +737,106 @@ export default function SettingsPage() {
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      toast({ title: "Invalid File Type", description: "Please select a PDF file.", variant: "destructive" });
-      if (event.target) event.target.value = ''; 
+    if (file.type !== "application/pdf" || file.size > 20 * 1024 * 1024) {
+      toast({ title: "Invalid Statement PDF", description: "Select a PDF file smaller than 20 MB.", variant: "destructive" });
+      event.target.value = '';
       return;
     }
-    setIsProcessingPdf(true); 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+
+    setIsProcessingPdf(true);
+    try {
+      // Keep the document in memory only. Do not put a multi-megabyte PDF in
+      // localStorage; persist only the validated transaction/account fields.
+      const pdfBytes = new Uint8Array(await file.arrayBuffer());
+      const parsed = await parseBobStatementPdf(pdfBytes);
+      const parsedDetails = Object.fromEntries(
+        Object.entries(parsed.accountDetails).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+      ) as Partial<AccountDetailsType>;
+      const nextAccountDetails: AccountDetailsType = {
+        ...INITIAL_ACCOUNT_DETAILS,
+        ...accountDetails,
+        ...parsedDetails,
+        accountNumber: parsed.accountNumber,
+      };
+      const netMovement = parsed.transactions.reduce(
+        (total, tx) => total + (tx.type === 'credit' ? Math.abs(tx.amount) : -Math.abs(tx.amount)),
+        0,
+      );
+      const nextBalance = parsed.closingBalance ?? ((parsed.openingBalance ?? balance) + netMovement);
+      const newestFirst = [...parsed.transactions].sort(
+        (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
+      );
+
+      // Extracted brand art is optional for transaction import. Only update the
+      // image keys when this PDF contains a usable logo crop.
+      let assets: StatementBrandAssets = {};
       try {
-        const pdfDataUri = e.target?.result as string;
-        const result = await extractTransactionsFromPdf({ pdfDataUri }); 
-
-        if (result.transactions && result.transactions.length > 0) {
-          let newBalanceTemp = balance;
-          const successfullyAddedTransactions: TransactionType[] = [];
-          let skippedCount = 0;
-
-          result.transactions.forEach((extractedTx: ExtractedTransaction) => {
-            if (!extractedTx.date || !extractedTx.description || typeof extractedTx.amount !== 'number' || !extractedTx.type) {
-              console.warn('Skipping transaction from PDF due to missing core fields:', extractedTx);
-              skippedCount++;
-              return;
-            }
-            
-            let parsedDate = new Date(extractedTx.date); 
-
-            if (isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100 ) {
-                const dateStr = extractedTx.date.trim();
-                const partsDMY = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2}|\d{4})$/);
-                if (partsDMY) {
-                    const day = parseInt(partsDMY[1], 10);
-                    const month = parseInt(partsDMY[2], 10);
-                    let year = parseInt(partsDMY[3], 10);
-                    if (year < 100) year += (year < 50 ? 2000 : 1900); 
-                    
-                    if (day > 0 && day <= 31 && month > 0 && month <= 12 && year >= 1980 && year <= 2100) {
-                        const tempDate = new Date(year, month - 1, day);
-                        if (tempDate.getFullYear() === year && tempDate.getMonth() === month - 1 && tempDate.getDate() === day) {
-                           parsedDate = tempDate;
-                        }
-                    }
-                }
-                if ((isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100) && !partsDMY) {
-                    const partsMDY = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2}|\d{4})$/);
-                    if (partsMDY) {
-                        const month = parseInt(partsMDY[1], 10);
-                        const day = parseInt(partsMDY[2], 10);
-                        let year = parseInt(partsMDY[3], 10);
-                        if (year < 100) year += (year < 50 ? 2000 : 1900);
-                        if (day > 0 && day <= 31 && month > 0 && month <= 12 && year >= 1980 && year <= 2100) {
-                           const tempDate = new Date(year, month - 1, day);
-                           if (tempDate.getFullYear() === year && tempDate.getMonth() === month - 1 && tempDate.getDate() === day) {
-                               parsedDate = tempDate;
-                           }
-                        }
-                    }
-                }
-            }
-
-
-            if (isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 1980 || parsedDate.getFullYear() > 2100 ) { 
-                console.warn(`Could not reliably parse date for PDF transaction: "${extractedTx.description}" with date string "${extractedTx.date}". Skipping.`);
-                skippedCount++;
-                return;
-            }
-
-            const newTransaction: TransactionType = {
-              id: crypto.randomUUID(),
-              date: parsedDate.toISOString(), 
-              description: extractedTx.description,
-              amount: extractedTx.amount,
-              type: extractedTx.type,
-            };
-            successfullyAddedTransactions.push(newTransaction);
-
-            if (newTransaction.type === 'credit') newBalanceTemp += newTransaction.amount;
-            else newBalanceTemp -= newTransaction.amount;
-          });
-
-          if (successfullyAddedTransactions.length > 0) {
-            setTransactions(prev => [...successfullyAddedTransactions, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() ));
-            setBalance(newBalanceTemp);
-            toast({ title: "Transactions Extracted", description: `${successfullyAddedTransactions.length} transactions added. ${skippedCount > 0 ? `${skippedCount} skipped due to date/data issues.` : ''}` });
-          } else {
-             toast({ title: "No New Transactions Added", description: `AI found no valid transactions or all were skipped due to date/data issues.` });
-          }
-        } else {
-          toast({ title: "No Transactions Found by AI", description: "AI could not find transactions or the format was not recognized.", variant: "default" });
-        }
-      } catch (error: any) {
-        console.error("Error processing PDF:", error);
-        toast({ title: "PDF Processing Error", description: error.message || "Error extracting transactions. Check console.", variant: "destructive" });
-      } finally {
-        setIsProcessingPdf(false); 
+        assets = await extractStatementBrandAssets(pdfBytes);
+      } catch (assetError) {
+        console.warn('Statement logo extraction failed; saved logos will be retained:', assetError);
       }
-    };
-    reader.readAsDataURL(file);
-    if (event.target) event.target.value = ''; 
-  };
 
+      const previousValues = {
+        account: localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY),
+        balance: localStorage.getItem(BALANCE_STORAGE_KEY),
+        transactions: localStorage.getItem(TRANSACTIONS_STORAGE_KEY),
+        bobLogo: localStorage.getItem(STATEMENT_LOGO_KEY),
+        bankLogo: localStorage.getItem(STATEMENT_BANK_LOGO_KEY),
+      };
+      try {
+        localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(nextAccountDetails));
+        localStorage.setItem(BALANCE_STORAGE_KEY, String(nextBalance));
+        localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(newestFirst));
+        if (assets.bobWorldLogo) localStorage.setItem(STATEMENT_LOGO_KEY, assets.bobWorldLogo);
+        if (assets.bankLogo) localStorage.setItem(STATEMENT_BANK_LOGO_KEY, assets.bankLogo);
+        await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+      } catch (storageError) {
+        const restore = (key: string, value: string | null) => {
+          if (value === null) localStorage.removeItem(key);
+          else localStorage.setItem(key, value);
+        };
+        try {
+          restore(ACCOUNT_DETAILS_STORAGE_KEY, previousValues.account);
+          restore(BALANCE_STORAGE_KEY, previousValues.balance);
+          restore(TRANSACTIONS_STORAGE_KEY, previousValues.transactions);
+          restore(STATEMENT_LOGO_KEY, previousValues.bobLogo);
+          restore(STATEMENT_BANK_LOGO_KEY, previousValues.bankLogo);
+        } catch (restoreError) {
+          console.error('Could not restore a previous local statement snapshot:', restoreError);
+        }
+        throw new Error('The imported statement could not be saved locally. Previous data was restored where possible. Check available browser storage.');
+      }
+
+      setAccountDetails(nextAccountDetails);
+      setBalance(nextBalance);
+      setTransactions(newestFirst);
+      setStatementPdfName(file.name);
+      setImageStates(previous => ({
+        ...previous,
+        statementLogo: assets.bobWorldLogo
+          ? { ...previous.statementLogo, dataUri: assets.bobWorldLogo, preview: assets.bobWorldLogo }
+          : previous.statementLogo,
+        statementBankLogo: assets.bankLogo
+          ? { ...previous.statementBankLogo, dataUri: assets.bankLogo, preview: assets.bankLogo }
+          : previous.statementBankLogo,
+      }));
+
+      toast({
+        title: "Statement imported",
+        description: newestFirst.length + " transactions replaced the previous list. Opening and closing balances were reconciled; payees and other app settings were preserved.",
+      });
+    } catch (error) {
+      console.error("Local statement extraction failed:", error);
+      toast({
+        title: "Statement extraction failed",
+        description: error instanceof Error ? error.message : "Could not parse the statement. Existing account and transaction data were not changed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPdf(false);
+      event.target.value = '';
+    }
+  };
   const openAddLiveAgentMessageDialog = () => {
     setEditingLiveAgentMessage(null);
     setCurrentMessageContent('');
@@ -866,8 +963,45 @@ export default function SettingsPage() {
             </section>
 
              <section className="space-y-4">
+               <h3 className="text-lg font-medium flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary" />Fund Transfer Security</h3>
+               <CardDescription>Set a separate four-digit TPIN for the local IMPS transfer flow. The app stores a salted PBKDF2 verifier, not the TPIN in plain text.</CardDescription>
+               <div className="rounded-xl border p-4 space-y-3">
+                 <p className="text-sm font-medium">{isTransferTpinConfigured ? 'Transfer TPIN is configured on this device.' : 'No transfer TPIN is configured yet.'}</p>
+                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                   <div><Label htmlFor="transferTpin">New 4-digit TPIN</Label><Input id="transferTpin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={transferTpin} onChange={event => setTransferTpin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1 tracking-[0.4em]" placeholder="••••" /></div>
+                   <div><Label htmlFor="confirmTransferTpin">Confirm TPIN</Label><Input id="confirmTransferTpin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={confirmTransferTpin} onChange={event => setConfirmTransferTpin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1 tracking-[0.4em]" placeholder="••••" /></div>
+                 </div>
+                 <div className="flex flex-wrap items-center gap-2">
+                   <Button type="button" onClick={handleSaveTransferTpin} disabled={isSavingTransferTpin || transferTpin.length !== 4 || confirmTransferTpin.length !== 4}>{isSavingTransferTpin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Save Transfer TPIN</Button>
+                   <p className="text-xs text-muted-foreground">Use a TPIN different from your login PIN. This local flow does not connect to the bank.</p>
+                 </div>
+               </div>
+             </section>
+
+             <section className="space-y-4">
+               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement Account & Branch Fields</h3>
+               <CardDescription>Complete any detail that is missing from the uploaded statement. These values are used when generating a new statement PDF.</CardDescription>
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                 <div><Label htmlFor="customerAddress">Customer Address</Label><Input id="customerAddress" value={accountDetails.customerAddress || ''} onChange={(e) => handleDetailsChange('customerAddress', e.target.value)} className="mt-1" placeholder="Customer postal address" /></div>
+                 <div><Label htmlFor="customerCity">Customer City</Label><Input id="customerCity" value={accountDetails.customerCity || ''} onChange={(e) => handleDetailsChange('customerCity', e.target.value)} className="mt-1" placeholder="City" /></div>
+                 <div><Label htmlFor="ckycNumber">CKYC Number</Label><Input id="ckycNumber" value={accountDetails.ckycNumber || ''} onChange={(e) => handleDetailsChange('ckycNumber', e.target.value)} className="mt-1" placeholder="CKYC number" /></div>
+                 <div><Label htmlFor="nominee">Nominee Name</Label><Input id="nominee" value={accountDetails.nominee || ''} onChange={(e) => handleDetailsChange('nominee', e.target.value)} className="mt-1" placeholder="Nominee name" /></div>
+                 <div><Label htmlFor="customerPin">Customer PIN / Postal Code</Label><Input id="customerPin" value={accountDetails.customerPin || ''} onChange={(e) => handleDetailsChange('customerPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="branchAddress">Branch Address</Label><Input id="branchAddress" value={accountDetails.branchAddress || ''} onChange={(e) => handleDetailsChange('branchAddress', e.target.value)} className="mt-1" placeholder="Branch postal address" /></div>
+                 <div><Label htmlFor="branchCity">Branch City</Label><Input id="branchCity" value={accountDetails.branchCity || ''} onChange={(e) => handleDetailsChange('branchCity', e.target.value)} className="mt-1" placeholder="City" /></div>
+                 <div><Label htmlFor="branchPin">Branch PIN / Postal Code</Label><Input id="branchPin" value={accountDetails.branchPin || ''} onChange={(e) => handleDetailsChange('branchPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="micrCode">MICR Code</Label><Input id="micrCode" value={accountDetails.micrCode || ''} onChange={(e) => handleDetailsChange('micrCode', e.target.value)} className="mt-1" inputMode="numeric" maxLength={9} placeholder="9-digit MICR" /></div>
+                 <div><Label htmlFor="statementOpeningBalance">Statement Opening Balance (INR)</Label><Input id="statementOpeningBalance" type="number" min="0" step="0.01" value={accountDetails.statementOpeningBalance ?? ''} onChange={(e) => setAccountDetails(prev => ({ ...prev, statementOpeningBalance: e.target.value === '' ? undefined : Number(e.target.value) }))} className="mt-1" placeholder="Opening balance" /></div>
+                 <div><Label htmlFor="statementPeriodFrom">Statement Period From</Label><Input id="statementPeriodFrom" type="date" value={accountDetails.statementPeriodFrom ? accountDetails.statementPeriodFrom.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodFrom', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div><Label htmlFor="statementPeriodTo">Statement Period To</Label><Input id="statementPeriodTo" type="date" value={accountDetails.statementPeriodTo ? accountDetails.statementPeriodTo.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodTo', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div className="sm:col-span-2"><Label htmlFor="statementNoteHindi">Statement Footer Note (Hindi)</Label><Textarea id="statementNoteHindi" value={accountDetails.statementNoteHindi || ''} onChange={(e) => handleDetailsChange('statementNoteHindi', e.target.value)} className="mt-1" rows={2} placeholder="हिंदी में स्टेटमेंट नोट" /></div>
+                 <div className="sm:col-span-2"><Label htmlFor="statementNoteEnglish">Statement Footer Note (English)</Label><Textarea id="statementNoteEnglish" value={accountDetails.statementNoteEnglish || accountDetails.statementNote || ''} onChange={(e) => handleDetailsChange('statementNoteEnglish', e.target.value)} className="mt-1" rows={2} placeholder="English statement note" /></div>
+               </div>
+             </section>
+
+             <section className="space-y-4">
               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement PDF Management</h3>
-              <CardDescription>Upload a PDF file to be used when the "Download statement" button is clicked in the app.</CardDescription>
+              <CardDescription>Inspect the reference PDF and extract the BOB World and Bank of Baroda logos into Settings. Use Import Statement Transactions below to parse the full transaction history and replace the saved list after balance validation. The source PDF is not stored.</CardDescription>
               <div>
                 <Label htmlFor="statement-pdf-upload">Statement PDF</Label>
                 <div className="flex items-center gap-2 mt-1">
@@ -893,7 +1027,6 @@ export default function SettingsPage() {
                         size="icon"
                         className="h-6 w-6"
                         onClick={() => {
-                          localStorage.removeItem(STATEMENT_PDF_KEY);
                           setStatementPdfName(null);
                           toast({ title: "PDF Removed", description: "The statement PDF has been cleared." });
                         }}
@@ -903,12 +1036,13 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                 <p className="text-xs text-muted-foreground mt-1">This PDF will be downloaded when a user clicks "Download statement".</p>
+                 <p className="text-xs text-muted-foreground mt-1">The uploaded PDF is read locally for its text and logo artwork. The original file is not stored; the app saves only the extracted account fields and transactions.</p>
               </div>
             </section>
 
             <section className="space-y-4">
               <h3 className="text-lg font-medium flex items-center"><ImageIconLucide className="mr-2 h-5 w-5 text-primary" />Manage Application Images</h3>
+              <CardDescription>The BOB World Logo uploaded here is reused in generated account statements and transaction receipt PDFs. Upload the BOB logo here if it is not already saved.</CardDescription>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {imageUploadConfig.map(config => (
                   <div key={config.key} className="space-y-2">
@@ -1067,8 +1201,8 @@ export default function SettingsPage() {
             </section>
 
             <section className="space-y-4">
-                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Automated Transaction Entry</h3>
-                <CardDescription>Upload a PDF bank statement to automatically add transactions. (Prototype feature - AI parsing quality may vary.)</CardDescription>
+                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
+                <CardDescription>Extract selectable PDF text locally. Image-only pages are processed with the bundled offline OCR engine on this device. No Genkit, generative AI, cloud OCR, or document upload is used. A successful parse replaces the saved account, balance and transaction data.</CardDescription>
                 <div>
                     <Button
                         type="button"
@@ -1081,7 +1215,7 @@ export default function SettingsPage() {
                         ) : (
                             <UploadCloud className="mr-2 h-4 w-4" />
                         )}
-                        {isProcessingPdf ? "Processing PDF..." : "Add Transactions by PDF"}
+                        {isProcessingPdf ? "Parsing statement locally..." : "Import Statement Transactions"}
                     </Button>
                     <input
                         type="file"

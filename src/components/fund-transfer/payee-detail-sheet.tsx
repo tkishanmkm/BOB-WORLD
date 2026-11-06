@@ -12,21 +12,21 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TransactionReceiptDialog } from '@/components/fund-transfer/transaction-receipt-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TransactionType, PayeeType, AccountDetailsType } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
-import { IndianRupee, UserCircle2, Repeat } from "lucide-react";
+import { IndianRupee, UserCircle2, Repeat, FileDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-// TransactionReceiptDialog import removed
 import { ACCOUNT_DETAILS_STORAGE_KEY, INITIAL_ACCOUNT_DETAILS } from '@/lib/constants';
-// useToast import removed
-import { cn } from '@/lib/utils';
 
 interface PayeeDetailSheetProps {
   payee: PayeeType | null;
   transactions: TransactionType[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onTransfer: (payee: PayeeType) => void;
 }
 
 const DetailRow: React.FC<{ label: string; value: string | number | undefined; icon?: React.ElementType, isCurrency?: boolean, customClass?: string }> = ({ label, value, icon: Icon, isCurrency, customClass }) => (
@@ -47,13 +47,9 @@ const DetailRow: React.FC<{ label: string; value: string | number | undefined; i
 );
 
 
-export function PayeeDetailSheet({ payee, transactions, open, onOpenChange }: PayeeDetailSheetProps) {
-  // State for receipt dialog removed
-  // const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
-  // const [selectedTransactionForReceipt, setSelectedTransactionForReceipt] = useState<TransactionType | null>(null);
-  
+export function PayeeDetailSheet({ payee, transactions, open, onOpenChange, onTransfer }: PayeeDetailSheetProps) {
   const [accountHolderDetails, setAccountHolderDetails] = useState<AccountDetailsType>(INITIAL_ACCOUNT_DETAILS);
-  // const { toast } = useToast(); // toast was for receipt
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -74,7 +70,7 @@ export function PayeeDetailSheet({ payee, transactions, open, onOpenChange }: Pa
   if (!payee) return null;
 
   const lastTransaction = transactions
-    .filter(tx => tx.payeeId === payee.id && tx.type === 'debit')
+    .filter(tx => tx.payeeId === payee.id && tx.type === 'debit' && !tx.description.trim().toUpperCase().startsWith('CHARGES FOR'))
     .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
     [0];
 
@@ -96,8 +92,16 @@ export function PayeeDetailSheet({ payee, transactions, open, onOpenChange }: Pa
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col p-0 bg-muted/30">
           <SheetHeader className="p-4 pb-2 text-center sticky top-0 bg-background z-10 border-b shadow-sm">
             <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted-foreground/30 mb-2" />
-            <SheetTitle className="text-lg font-semibold">{payee.name}</SheetTitle>
-            <SheetDescription>{maskAccountNumber(payee.accountNumber, payee.ifscCode)} &bull; {payee.ifscCode}</SheetDescription>
+            <div className="flex items-center justify-center gap-3">
+              <Avatar className="h-10 w-10 border">
+                {payee.photoDataUri ? <AvatarImage src={payee.photoDataUri} alt={payee.name} /> : null}
+                <AvatarFallback className="bg-primary text-primary-foreground">{payee.name.trim().split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 text-left">
+                <SheetTitle className="text-lg font-semibold">{payee.name}</SheetTitle>
+                <SheetDescription>{maskAccountNumber(payee.accountNumber, payee.ifscCode)} &bull; {payee.ifscCode}</SheetDescription>
+              </div>
+            </div>
           </SheetHeader>
 
           <ScrollArea className="flex-1 overflow-y-auto">
@@ -117,7 +121,7 @@ export function PayeeDetailSheet({ payee, transactions, open, onOpenChange }: Pa
                   <Card className="shadow-md">
                       <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
                           <CardTitle className="text-base text-primary flex items-center"><Repeat className="mr-2 h-5 w-5"/>Last Transaction</CardTitle>
-                          {/* Download Receipt Button Removed */}
+                          {lastTransaction && <Button type="button" size="sm" variant="outline" onClick={() => setIsReceiptDialogOpen(true)}><FileDown className="mr-2 h-4 w-4" />Receipt PDF</Button>}
                       </CardHeader>
                       <CardContent className="p-4 pt-1">
                           {lastTransaction ? (
@@ -139,14 +143,21 @@ export function PayeeDetailSheet({ payee, transactions, open, onOpenChange }: Pa
             <SheetClose asChild>
               <Button variant="outline" className="w-full py-3 text-base">Close</Button>
             </SheetClose>
-            <Button className="w-full py-3 text-base bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button className="w-full py-3 text-base bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => onTransfer(payee)}>
                <Repeat className="mr-2 h-4 w-4"/> Transfer Again
             </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      {/* TransactionReceiptDialog rendering removed */}
+      {lastTransaction && (
+        <TransactionReceiptDialog
+          open={isReceiptDialogOpen}
+          onOpenChange={setIsReceiptDialogOpen}
+          transaction={lastTransaction}
+          payee={payee}
+          remitterAccountDetails={accountHolderDetails}
+        />
+      )}
     </>
   );
 }

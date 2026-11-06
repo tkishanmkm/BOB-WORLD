@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddPayeeDialog } from '@/components/fund-transfer/add-payee-dialog';
 import { PayeeDetailSheet } from '@/components/fund-transfer/payee-detail-sheet'; // New
 import { ArrowLeft, UserPlus, Search } from 'lucide-react';
@@ -13,6 +13,8 @@ import type { PayeeType, TransactionType } from '@/lib/types'; // Added Transact
 import { INITIAL_PAYEES, PAYEES_STORAGE_KEY, TRANSACTIONS_STORAGE_KEY, INITIAL_TRANSACTIONS } from '@/lib/constants'; // Added TRANSACTIONS_STORAGE_KEY
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TransferFlowDialog } from '@/components/fund-transfer/transfer-flow-dialog';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from '@/lib/indexed-db';
 
 export default function FundTransferPage() {
   const [payees, setPayees] = useState<PayeeType[]>([]);
@@ -21,8 +23,13 @@ export default function FundTransferPage() {
   const [isAddPayeeDialogOpen, setIsAddPayeeDialogOpen] = useState(false);
   const [selectedPayeeForDetail, setSelectedPayeeForDetail] = useState<PayeeType | null>(null); // New
   const [isPayeeDetailSheetOpen, setIsPayeeDetailSheetOpen] = useState(false); // New
+  const [transferPayee, setTransferPayee] = useState<PayeeType | null>(null);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+      if (cancelled) return;
     const storedPayeesString = localStorage.getItem(PAYEES_STORAGE_KEY);
     if (storedPayeesString) {
       try {
@@ -48,9 +55,11 @@ export default function FundTransferPage() {
     } else {
       setAllTransactions(INITIAL_TRANSACTIONS);
     }
+    }).catch(error => console.error('Could not restore payees and transactions from IndexedDB:', error));
+    return () => { cancelled = true; };
   }, []);
 
-  const handleSavePayee = (newPayeeData: Omit<PayeeType, 'id'>, id?: string) => {
+  const handleSavePayee = async (newPayeeData: Omit<PayeeType, 'id'>, id?: string) => {
     if (id) {
         console.warn("Edit payee action triggered from fund transfer page, this should be for add only.");
         return;
@@ -59,6 +68,7 @@ export default function FundTransferPage() {
     const updatedPayees = [newPayee, ...payees].sort((a,b) => a.name.localeCompare(b.name)); 
     setPayees(updatedPayees);
     localStorage.setItem(PAYEES_STORAGE_KEY, JSON.stringify(updatedPayees));
+    await persistStorageKeys(BOB_WORLD_STATE_KEYS);
   };
 
   const filteredPayees = payees.filter(payee =>
@@ -128,6 +138,7 @@ export default function FundTransferPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <Avatar className="h-10 w-10 border">
+                            {payee.photoDataUri ? <AvatarImage src={payee.photoDataUri} alt={payee.name} /> : null}
                             <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
                               {getInitials(payee.name)}
                             </AvatarFallback>
@@ -164,11 +175,23 @@ export default function FundTransferPage() {
         onSavePayee={handleSavePayee}
         dialogTitle="Add New Payee"
       />
-      <PayeeDetailSheet 
+      <PayeeDetailSheet
         payee={selectedPayeeForDetail}
         transactions={allTransactions}
         open={isPayeeDetailSheetOpen}
         onOpenChange={setIsPayeeDetailSheetOpen}
+        onTransfer={payee => {
+          setSelectedPayeeForDetail(payee);
+          setTransferPayee(payee);
+          setIsPayeeDetailSheetOpen(false);
+          setIsTransferDialogOpen(true);
+        }}
+      />
+      <TransferFlowDialog
+        open={isTransferDialogOpen}
+        onOpenChange={setIsTransferDialogOpen}
+        payee={transferPayee}
+        onTransferCompleted={(updatedTransactions) => setAllTransactions(updatedTransactions)}
       />
     </div>
   );

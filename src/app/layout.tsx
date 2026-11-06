@@ -56,13 +56,22 @@ export default function RootLayout({
       document.head.appendChild(meta);
     }
 
-    let faviconLink = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
-    if (!faviconLink) {
-      faviconLink = document.createElement('link');
-      faviconLink.rel = 'icon';
-      document.head.appendChild(faviconLink);
-    }
-    faviconLink.href = '/favicon.ico';
+    const setHeadLink = (rel: string, href: string, type?: string, sizes?: string) => {
+      let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ''}`);
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+      if (type) link.type = type;
+      if (sizes) link.setAttribute('sizes', sizes);
+    };
+    setHeadLink('icon', '/favicon.ico', 'image/x-icon');
+    setHeadLink('icon', '/favicon-16x16.png', 'image/png', '16x16');
+    setHeadLink('icon', '/favicon-32x32.png', 'image/png', '32x32');
+    setHeadLink('apple-touch-icon', '/apple-touch-icon.png', 'image/png');
+    setHeadLink('manifest', '/site.webmanifest');
   }, []);
 
   if (showSplash) {

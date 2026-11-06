@@ -36,6 +36,8 @@ export function AddPayeeDialog({
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [nickname, setNickname] = useState('');
+  const [photoDataUri, setPhotoDataUri] = useState<string | undefined>(undefined);
+  const [photoError, setPhotoError] = useState('');
   const { toast } = useToast();
 
   const effectiveDialogTitle = existingPayee ? "Edit Payee" : initialDialogTitle;
@@ -47,15 +49,59 @@ export function AddPayeeDialog({
         setAccountNumber(existingPayee.accountNumber);
         setIfscCode(existingPayee.ifscCode);
         setNickname(existingPayee.nickname || '');
+        setPhotoDataUri(existingPayee.photoDataUri);
       } else {
         // Reset form for adding new payee
         setName('');
         setAccountNumber('');
         setIfscCode('');
         setNickname('');
+        setPhotoDataUri(undefined);
       }
+      setPhotoError('');
     }
   }, [open, existingPayee]);
+
+  const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setPhotoError('');
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setPhotoError('Choose an image smaller than 5 MB.');
+      return;
+    }
+    try {
+      const dataUri = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('The image could not be read.'));
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('The image could not be read.'));
+        reader.readAsDataURL(file);
+      });
+      const photo = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new window.Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('The selected file is not a usable image.'));
+        image.src = dataUri;
+      });
+      const canvas = document.createElement('canvas');
+      const size = 256;
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Image processing is unavailable on this device.');
+      const cropSize = Math.min(photo.naturalWidth, photo.naturalHeight);
+      const cropX = (photo.naturalWidth - cropSize) / 2;
+      const cropY = (photo.naturalHeight - cropSize) / 2;
+      context.drawImage(photo, cropX, cropY, cropSize, cropSize, 0, 0, size, size);
+      const compressed = canvas.toDataURL('image/jpeg', 0.78);
+      canvas.width = 0;
+      canvas.height = 0;
+      setPhotoDataUri(compressed);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'The image could not be processed.');
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -67,12 +113,12 @@ export function AddPayeeDialog({
       });
       return;
     }
-    if (accountNumber.trim().length < 9 || accountNumber.trim().length > 18) {
-        toast({ title: "Error", description: "Account number must be between 9 and 18 digits.", variant: "destructive" });
+    if (!/^\d{9,18}$/.test(accountNumber.trim())) {
+        toast({ title: "Error", description: "Account number must contain 9 to 18 digits only.", variant: "destructive" });
         return;
     }
-    if (ifscCode.trim().length !== 11) {
-         toast({ title: "Error", description: "IFSC code must be 11 characters long.", variant: "destructive" });
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.trim().toUpperCase())) {
+         toast({ title: "Error", description: "Enter a valid 11-character IFSC code.", variant: "destructive" });
         return;
     }
 
@@ -81,6 +127,7 @@ export function AddPayeeDialog({
       accountNumber: accountNumber.trim(),
       ifscCode: ifscCode.trim().toUpperCase(),
       nickname: nickname.trim() || undefined,
+      photoDataUri,
     }, existingPayee?.id);
 
     toast({
@@ -121,7 +168,9 @@ export function AddPayeeDialog({
               <Input
                 id="payee-account-number"
                 value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                inputMode="numeric"
+                maxLength={18}
                 className="col-span-3"
                 placeholder="Payee account number"
                 required
@@ -152,6 +201,20 @@ export function AddPayeeDialog({
                 className="col-span-3"
                 placeholder="Optional nickname"
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="payee-photo" className="text-right">Photo</Label>
+              <div className="col-span-3 space-y-2">
+                <Input id="payee-photo" type="file" accept="image/*" onChange={handlePhotoChange} className="text-xs" />
+                {photoDataUri && (
+                  <div className="flex items-center gap-3">
+                    <img src={photoDataUri} alt="Payee photo preview" className="h-12 w-12 rounded-full border object-cover" />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setPhotoDataUri(undefined)}>Remove photo</Button>
+                  </div>
+                )}
+                {photoError && <p role="alert" className="text-xs text-destructive">{photoError}</p>}
+                <p className="text-xs text-muted-foreground">Optional. The image is resized and saved on this device.</p>
+              </div>
             </div>
           </div>
           <DialogFooter>
