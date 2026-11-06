@@ -8,28 +8,6 @@ export interface StatementDownloadAssets {
   bankLogo?: string | null;
 }
 
-function dataUriParts(dataUri: string): { mime: string; base64: string; extension: string } | null {
-  const match = /^data:(image\/(?:png|jpeg|jpg));base64,([a-z0-9+/=]+)$/i.exec(dataUri);
-  if (!match) return null;
-  const mime = match[1].toLowerCase();
-  return {
-    mime,
-    base64: match[2],
-    extension: mime.includes('png') ? 'png' : 'jpg',
-  };
-}
-
-async function blobToDataUri(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read the statement brand asset.'));
-    reader.onload = () => typeof reader.result === 'string'
-      ? resolve(reader.result)
-      : reject(new Error('Could not encode the statement brand asset.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
  * Loads the logo assets extracted from the reference statement as the
  * first-run defaults. User-uploaded Settings logos always take precedence.
@@ -83,91 +61,49 @@ function dataUriToBlob(dataUri: string, mime: string): Blob {
 }
 
 /**
- * Saves a generated statement to the device's Downloads location where the
- * platform exposes one. iOS native apps use Documents (visible in Files);
- * iOS Safari and desktop browsers use the browser download mechanism.
- *
- * The extracted brand images are also exported as separate files, while
- * remaining embedded in the generated PDF.
+ * Saves exactly one generated statement PDF. Branding stays embedded in the
+ * PDF; source logo assets are never exported as separate files or attachments.
  */
 export async function saveStatementPdfAndAssets(
   pdf: Blob,
   fileName: string,
-  assets: StatementDownloadAssets = {},
 ): Promise<string> {
   const platform = Capacitor.getPlatform();
   const native = Capacitor.isNativePlatform();
   const pdfDataUri = await blobToDataUri(pdf);
   await writeAppState(STATEMENT_PDF_KEY, pdfDataUri);
 
+  const safeFileName = fileName.toLowerCase().endsWith('.pdf') ? fileName : fileName + '.pdf';
   if (native) {
-    const directory = Directory.Documents;
-    const downloadsPath = (relativePath: string) => 'Downloads/' + relativePath;
     await Filesystem.writeFile({
-      path: downloadsPath(fileName),
+      path: 'Downloads/' + safeFileName,
       data: pdfDataUri.split(',')[1],
-      directory,
+      directory: Directory.Documents,
       recursive: true,
     });
-
-    const savedAssets: Array<[string, string | null | undefined]> = [
-      ['BOB-World-Logo', assets.bobWorldLogo],
-      ['Bank-of-Baroda-Logo', assets.bankLogo],
-    ];
-    for (const [baseName, dataUri] of savedAssets) {
-      if (!dataUri) continue;
-      const parts = dataUriParts(dataUri);
-      if (!parts) continue;
-      await Filesystem.writeFile({
-        path: downloadsPath('Statement-Assets/' + baseName + '.' + parts.extension),
-        data: parts.base64,
-        directory,
-        recursive: true,
-      });
-    }
-
     return platform === 'android'
       ? 'Documents/Downloads'
       : 'Files > On My iPhone > BOB World > Downloads';
   }
 
-  const browserAssets: Array<[string, string | null | undefined]> = [
-    ['BOB-World-Logo', assets.bobWorldLogo],
-    ['Bank-of-Baroda-Logo', assets.bankLogo],
-  ];
-  const shareFiles = [new File([pdf], fileName, { type: 'application/pdf' })];
-  for (const [baseName, dataUri] of browserAssets) {
-    if (!dataUri) continue;
-    const parts = dataUriParts(dataUri);
-    if (!parts) continue;
-    shareFiles.push(new File([dataUriToBlob(dataUri, parts.mime)], baseName + '.' + parts.extension, { type: parts.mime }));
-  }
-
-  // iOS Safari exposes Save to Files through the native file share sheet.
+  const pdfFile = new File([pdf], safeFileName, { type: 'application/pdf' });
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' && navigator.canShare({ files: shareFiles })) {
+      typeof navigator.canShare === 'function' && navigator.canShare({ files: [pdfFile] })) {
     try {
       await navigator.share({
-        files: shareFiles,
-        title: 'BOB World transaction statement',
+        files: [pdfFile],
+        title: 'BOB World account statement',
       });
       return 'iOS/browser share sheet (choose Save to Files)';
     } catch (shareError) {
       if (shareError instanceof Error && shareError.name === 'AbortError') {
         return 'Share sheet closed without saving';
       }
-      console.warn('Statement share sheet unavailable; using browser downloads:', shareError);
+      console.warn('Single-PDF share sheet unavailable; using browser download:', shareError);
     }
   }
 
-  triggerBrowserDownload(pdf, fileName);
-  for (const [baseName, dataUri] of browserAssets) {
-    if (!dataUri) continue;
-    const parts = dataUriParts(dataUri);
-    if (!parts) continue;
-    triggerBrowserDownload(dataUriToBlob(dataUri, parts.mime), baseName + '.' + parts.extension);
-  }
-
+  triggerBrowserDownload(pdf, safeFileName);
   return 'Downloads';
 }
 
