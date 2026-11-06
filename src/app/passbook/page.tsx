@@ -41,7 +41,7 @@ import Link from 'next/link';
 import { format, subDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { generateBobStatementPdf } from '@/lib/bob-statement-pdf';
-import { ensureStatementBrandAssets, saveStatementPdfAndAssets } from '@/lib/statement-download';
+import { ensureStatementBrandAssets, saveStatementPdf } from '@/lib/statement-download';
 import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 import { getAccountTypeLabel } from '@/lib/account-type';
 
