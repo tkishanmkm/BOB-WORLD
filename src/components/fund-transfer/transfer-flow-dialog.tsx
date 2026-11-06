@@ -124,7 +124,7 @@ export function TransferFlowDialog({
       return;
     }
     if (amount > 500_000) {
-      setError('IMPS transfers in this flow are limited to â‚¹5,00,000.');
+      setError('IMPS transfers in this flow are limited to ₹5,00,000.');
       return;
     }
     if (!charge) {
@@ -311,7 +311,7 @@ export function TransferFlowDialog({
             <>
               <DialogHeader>
                 <DialogTitle>Transfer to {payee.name}</DialogTitle>
-                <DialogDescription>IMPS transfer Â· {maskAccount(payee.accountNumber)} Â· {payee.ifscCode}</DialogDescription>
+                <DialogDescription>IMPS transfer · {maskAccount(payee.accountNumber)} · {payee.ifscCode}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
@@ -321,7 +321,7 @@ export function TransferFlowDialog({
                   </Avatar>
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{payee.name}</p>
-                    <p className="text-xs text-muted-foreground">{maskAccount(payee.accountNumber)} Â· {payee.ifscCode}</p>
+                    <p className="text-xs text-muted-foreground">{maskAccount(payee.accountNumber)} · {payee.ifscCode}</p>
                   </div>
                   <div className="ml-auto text-xs font-medium text-muted-foreground">IMPS</div>
                 </div>
@@ -332,7 +332,7 @@ export function TransferFlowDialog({
                     <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input id="imps-amount" value={amountText} onChange={event => setAmountText(event.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} inputMode="decimal" type="text" placeholder="0.00" className="pl-9 text-lg font-semibold" />
                   </div>
-                  <p className="text-xs text-muted-foreground">IMPS limit in this flow: â‚¹1 to â‚¹5,00,000.</p>
+                  <p className="text-xs text-muted-foreground">IMPS limit in this flow: ₹1 to ₹5,00,000.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -341,10 +341,10 @@ export function TransferFlowDialog({
                 </div>
 
                 <div className="rounded-xl border bg-muted/20 p-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Available balance</span><span className="font-semibold">â‚¹{money(balance)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">IMPS charge (including GST)</span><span>{charge ? 'â‚¹' + money(charge.total) : 'â€”'}</span></div>
-                  {charge && <div className="flex justify-between border-t pt-2 font-semibold"><span>Total debit</span><span>â‚¹{money(totalDebit)}</span></div>}
-                  <p className="text-[11px] text-muted-foreground">Charges: up to â‚¹1,000 = â‚¹2.95 Â· â‚¹1,001â€“â‚¹25,000 = â‚¹5.90 Â· â‚¹25,001â€“â‚¹5,00,000 = â‚¹17.70 (18% GST included).</p>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Available balance</span><span className="font-semibold">₹{money(balance)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">IMPS charge (including GST)</span><span>{charge ? '₹' + money(charge.total) : 'â€”'}</span></div>
+                  {charge && <div className="flex justify-between border-t pt-2 font-semibold"><span>Total debit</span><span>₹{money(totalDebit)}</span></div>}
+                  <p className="text-[11px] text-muted-foreground">Charges: up to ₹1,000 = ₹2.95 · ₹1,001â€“₹25,000 = ₹5.90 · ₹25,001â€“₹5,00,000 = ₹17.70 (18% GST included).</p>
                 </div>
               </div>
               {error && <p role="alert" className="text-sm text-destructive flex items-start gap-2"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}{error.includes('Settings') && <Link className="underline font-semibold" href="/settings">Open Settings</Link>}</p>}
@@ -364,11 +364,11 @@ export function TransferFlowDialog({
               <div className="space-y-4 py-4">
                 <div className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
                   <ShieldCheck className="h-8 w-8 text-primary" />
-                  <div><p className="font-semibold">{payee.name}</p><p className="text-sm text-muted-foreground">â‚¹{money(amount)} + â‚¹{money(charge?.total || 0)} charge</p></div>
+                  <div><p className="font-semibold">{payee.name}</p><p className="text-sm text-muted-foreground">₹{money(amount)} + ₹{money(charge?.total || 0)} charge</p></div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transfer-tpin">4-digit TPIN</Label>
-                  <Input id="transfer-tpin" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={tpin} onChange={event => setTpin(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="â€¢â€¢â€¢â€¢" className="text-center tracking-[0.6em] text-xl" />
+                  <Input id="transfer-tpin" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={tpin} onChange={event => setTpin(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="••••" className="text-center tracking-[0.6em] text-xl" />
                 </div>
                 {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
               </div>
@@ -389,19 +389,18 @@ export function TransferFlowDialog({
                 <div className="rounded-xl border bg-background p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border">
-                      {remitter.profileImageUrl ? <AvatarImage src={remitter.profileImageUrl} alt={remitter.name} /> : null}
-                      <AvatarFallback className="bg-primary text-primary-foreground">{initials(remitter.name)}</AvatarFallback>
+                      <AvatarFallback className="bg-[#173b68] text-white font-bold">JK</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold">BOB World</p>
-                      <p className="text-xs text-muted-foreground">Transfer security notification Â· now</p>
+                      <p className="font-semibold">JK-BOBSMS-S</p>
+                      <p className="text-xs text-muted-foreground">BOB World transfer notification · now</p>
                     </div>
                     <Smartphone className="h-5 w-5 text-primary" />
                   </div>
                   <div className="mt-3 rounded-lg bg-muted/50 p-3">
-                    <p className="text-sm">One-time password for your IMPS transfer of <strong>â‚¹{money(amount)}</strong> to <strong>{payee.name}</strong>.</p>
+                    <p className="text-sm">One-time password for your IMPS transfer of <strong>₹{money(amount)}</strong> to <strong>{payee.name}</strong>.</p>
                     <p className="mt-2 text-center text-2xl font-bold tracking-[0.28em]">{localOtp}</p>
-                    <p className="mt-2 text-[11px] text-muted-foreground">Local verification code. No SMS or bank OTP is sent by this app.</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">Local verification notification for this app only. No SMS or bank OTP is sent.</p>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -429,7 +428,7 @@ export function TransferFlowDialog({
               <div className="-mt-7 relative rounded-xl border bg-background px-5 pb-5 pt-5 shadow-lg">
                 <div className="border-b border-dashed pb-4 text-center">
                   <p className="text-sm text-muted-foreground">Amount</p>
-                  <p className="mt-1 text-2xl font-bold">â‚¹ {amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                  <p className="mt-1 text-2xl font-bold">₹ {amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="space-y-4 pt-4 text-sm">
                   <div className="flex justify-between gap-4"><span className="text-muted-foreground">Paying to</span><strong className="text-right">{payee.name}</strong></div>
@@ -439,8 +438,8 @@ export function TransferFlowDialog({
                   <div className="flex justify-between gap-4"><span className="text-muted-foreground">Reference number</span><strong className="text-right">{result.transaction.referenceNumber}</strong></div>
                 </div>
                 <div className="mt-4 border-t border-dashed pt-3 text-xs text-muted-foreground">
-                  <div className="flex justify-between"><span>IMPS charges (incl. GST)</span><span>â‚¹{money(result.chargeTransaction.amount)}</span></div>
-                  <div className="mt-1 flex justify-between font-semibold"><span>Total debited</span><span>â‚¹{money(amount + result.chargeTransaction.amount)}</span></div>
+                  <div className="flex justify-between"><span>IMPS charges (incl. GST)</span><span>₹{money(result.chargeTransaction.amount)}</span></div>
+                  <div className="mt-1 flex justify-between font-semibold"><span>Total debited</span><span>₹{money(amount + result.chargeTransaction.amount)}</span></div>
                 </div>
               </div>
               <div className="flex flex-col items-center gap-3 pt-4">
