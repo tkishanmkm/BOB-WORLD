@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: bob-world
-    runtime: node
-    region: singapore
-    plan: free
-    buildCommand: npm ci && npm run build
-    startCommand: npm run start
-    healthCheckPath: /
