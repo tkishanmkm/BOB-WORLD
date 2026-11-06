@@ -359,8 +359,11 @@ function drawTableHeader(doc: jsPDF, y: number): void {
   }
 }
 
-function estimateRowHeight(_doc: jsPDF, _row: StatementRow): number {
-  return 7.76;
+function estimateRowHeight(doc: jsPDF, row: StatementRow): number {
+  doc.setFont('LiberationSans', 'normal');
+  doc.setFontSize(7.0);
+  const descriptionLines = doc.splitTextToSize(row.description || '-', COLUMN_WIDTHS[3] - 1.4);
+  return Math.max(7.76, 4.5 + descriptionLines.length * 3.0);
 }
 
 function drawTableRow(doc: jsPDF, row: StatementRow, y: number, height: number, alternate: boolean): void {
@@ -393,8 +396,7 @@ function drawTableRow(doc: jsPDF, row: StatementRow, y: number, height: number, 
     doc.setFontSize(7.0);
     doc.setTextColor(27, 27, 27);
     const lines = doc.splitTextToSize(values[index], width - 1.4);
-    const maxLines = index === 3 ? 2 : 1;
-    const visibleLines = lines.slice(0, maxLines);
+    const visibleLines = lines;
     const lineHeight = 3.0;
     const textY = y + Math.max(2.0, (height - visibleLines.length * lineHeight) / 2 + 2.35);
     const textX = alignments[index] === 'left'
@@ -515,13 +517,26 @@ function makeRows(
   return rows;
 }
 
-function paginate(_doc: jsPDF, rows: StatementRow[]): StatementRow[][] {
-  const first = rows.slice(0, FIRST_PAGE_ROW_LIMIT);
-  const remaining: StatementRow[][] = [];
-  for (let offset = FIRST_PAGE_ROW_LIMIT; offset < rows.length; offset += CONTINUATION_ROW_LIMIT) {
-    remaining.push(rows.slice(offset, offset + CONTINUATION_ROW_LIMIT));
+function paginate(doc: jsPDF, rows: StatementRow[]): StatementRow[][] {
+  const pages: StatementRow[][] = [];
+  let pageRows: StatementRow[] = [];
+  let usedHeight = 0;
+  let pageIndex = 0;
+  for (const row of rows) {
+    const tableY = pageIndex === 0 ? FIRST_TABLE_Y : CONTINUATION_TABLE_Y;
+    const availableHeight = FOOTER_TOP - 1.5 - (tableY + HEADER_HEIGHT);
+    const rowHeight = estimateRowHeight(doc, row);
+    if (pageRows.length > 0 && usedHeight + rowHeight > availableHeight) {
+      pages.push(pageRows);
+      pageRows = [];
+      usedHeight = 0;
+      pageIndex += 1;
+    }
+    pageRows.push(row);
+    usedHeight += rowHeight;
   }
-  return [first, ...remaining].filter(pageRows => pageRows.length > 0);
+  if (pageRows.length) pages.push(pageRows);
+  return pages;
 }
 
 /**
