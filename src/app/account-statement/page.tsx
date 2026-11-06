@@ -19,7 +19,7 @@ import {
   STATEMENT_BANK_LOGO_KEY,
 } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
-import { ensureStatementBrandAssets, saveStatementPdfAndAssets } from '@/lib/statement-download';
+import { ensureStatementBrandAssets, savePdfToDownloads } from '@/lib/statement-download';
 import { generateBobStatementPdf } from '@/lib/bob-statement-pdf';
 import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 
@@ -121,19 +121,10 @@ export default function AccountStatementPage() {
       const lastFour = accountDetails.accountNumber.replace(/\D/g, '').slice(-4) || 'XXXX';
       const fileName = 'BOBWORLD_STMT_XX' + lastFour + '_' + format(new Date(), 'ddMMyyyy') + '.pdf';
 
-      const savedLocation = await saveStatementPdfAndAssets(pdfBlob, fileName, {
-        bobWorldLogo,
-        bankLogo,
-      });
-      const shareSheetOpened = savedLocation.includes('share sheet');
-      const shareSheetCancelled = savedLocation === 'Share sheet closed without saving';
+      const savedLocation = await savePdfToDownloads(pdfBlob, fileName);
       toast({
-        title: shareSheetCancelled ? 'Statement not saved' : shareSheetOpened ? 'Save statement to Files' : 'Statement downloaded',
-        description: shareSheetOpened
-          ? fileName + ' and its logo assets are ready in the share sheet. Choose Save to Files.'
-          : shareSheetCancelled
-            ? 'The share sheet was closed before a file was saved.'
-            : fileName + ' saved to ' + savedLocation + '.',
+        title: 'Statement PDF downloaded',
+        description: fileName + ' saved to ' + savedLocation + '. Only the PDF file was exported.',
       });
     } catch (error) {
       console.error('Statement PDF generation failed:', error);
