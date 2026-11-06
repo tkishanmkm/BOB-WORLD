@@ -294,14 +294,6 @@ export function TransactionReceiptDialog({
       row('Transfer date', formattedDateTime, true);
       row('Reference ID', transaction.referenceNumber || transaction.id || '-');
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.2);
-      doc.setTextColor(80, 83, 88);
-      doc.text('PERSONAL RECORD - NOT ISSUED BY THE BANK', pageWidth / 2, 275.5, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.text('Generated locally from information saved in this app.', pageWidth / 2, 280, { align: 'center' });
-
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
       const blob = doc.output('blob');
@@ -356,10 +348,6 @@ export function TransactionReceiptDialog({
                 <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Reference number</span><strong className='max-w-[62%] break-all text-right text-[#17191d]'>{transaction.referenceNumber || transaction.id}</strong></div>
                 {transaction.comments && <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Remarks</span><strong className='max-w-[62%] break-words text-right text-[#17191d]'>{transaction.comments}</strong></div>}
               </div>
-              <div className='mt-5 border-t border-dashed border-[#b8bbc0] pt-3 text-center'>
-                <p className='text-[10px] font-semibold tracking-wide text-[#5c626b]'>PERSONAL RECORD · NOT ISSUED BY THE BANK</p>
-                <p className='mt-1 text-[10px] text-[#777d85]'>Generated locally from information saved in this app.</p>
-              </div>
             </div>
             <div className='pointer-events-none absolute -bottom-2 left-0 right-0 h-4' style={{ backgroundImage: 'radial-gradient(circle at 8px 0, #f4f5f7 8px, transparent 8.5px)', backgroundSize: '24px 16px', backgroundRepeat: 'repeat-x' }} />
           </div>
@@ -376,3 +364,5 @@ export function TransactionReceiptDialog({
     </Dialog>
   );
 }
+
+[executed on device: Kishan (c4aa9a86-57f1-4320-a86d-0513b6434d61)]

@@ -149,8 +149,7 @@ export async function saveStatementPdfAndAssets(
     try {
       await navigator.share({
         files: shareFiles,
-        title: 'BOB World personal transaction report',
-        text: 'Personal record generated from data saved in this app.',
+        title: 'BOB World transaction statement',
       });
       return 'iOS/browser share sheet (choose Save to Files)';
     } catch (shareError) {
@@ -198,3 +197,5 @@ export async function savePdfToDownloads(pdf: Blob, fileName: string): Promise<s
   triggerBrowserDownload(pdfOnly, fileName.toLowerCase().endsWith('.pdf') ? fileName : fileName + '.pdf');
   return 'Downloads';
 }
+
+[executed on device: Kishan (c4aa9a86-57f1-4320-a86d-0513b6434d61)]

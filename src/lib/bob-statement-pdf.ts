@@ -10,7 +10,6 @@ export interface BobStatementPdfOptions {
   to: Date;
   bobWorldLogo?: string | null;
   bankLogo?: string | null;
-  generatedAt?: Date;
 }
 
 interface StatementRow {
@@ -46,7 +45,6 @@ const HINDI_IMAGE_CACHE = new Map<string, { data: string; height: number }>();
 
 const DEFAULT_NOTE_HINDI = 'नोट : हम आपको यह सूचित करते हैं कि इसमें किसी प्रकार की विसंगति पाए जाने पर अपनी मूल शाखा से संपर्क करें अथवा बॉब वर्ल्ड ऐप की सहायता से अपनी शिकायत दर्ज करें।';
 const DEFAULT_NOTE_ENGLISH = 'Note: In case you find any discrepancy, we advise you to take it up with your base branch or raise a complaint using bob World.';
-const PERSONAL_COPY_HINDI = 'यह व्यक्तिगत विवरण इस ऐप में उपलब्ध जानकारी के आधार पर तैयार किया गया है।';
 
 const money = (value: number): string => new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,
@@ -253,14 +251,6 @@ function drawHeader(doc: jsPDF, from: Date, to: Date, headerArtwork: string): vo
   doc.setFontSize(11.5);
   doc.setTextColor(255, 255, 255);
   doc.text('Account Statement from ' + dateText(from) + ' to ' + dateText(to), PAGE_WIDTH / 2, 51.0, { align: 'center' });
-
-  // A visible provenance strip replaces the source PDF's bank-origin statement line.
-  doc.setFillColor(27, 48, 83);
-  doc.rect(SOURCE_HEADER_X, 55.1, SOURCE_HEADER_WIDTH, 3.1, 'F');
-  doc.setFont('LiberationSans', 'bold');
-  doc.setFontSize(6.3);
-  doc.setTextColor(255, 255, 255);
-  doc.text('PERSONAL RECORD - NOT ISSUED BY THE BANK', PAGE_WIDTH / 2, 57.3, { align: 'center' });
 }
 
 function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork: string): void {
@@ -410,7 +400,6 @@ function drawTableRow(doc: jsPDF, row: StatementRow, y: number, height: number, 
 function drawFooter(
   doc: jsPDF,
   _account: AccountDetailsType,
-  generatedAt: Date,
   pageNumber: number,
   totalPages: number,
   noteArtwork: string,
@@ -419,27 +408,6 @@ function drawFooter(
   const noteX = 5.47;
   const noteY = FOOTER_TOP;
   doc.addImage(noteArtwork, 'PNG', noteX, noteY, 199.0, FOOTER_NOTE_HEIGHT, 'personal-report-note', 'FAST');
-
-  const stamp = format(generatedAt, 'dd/MM/yyyy hh:mm:ss a');
-  addHindi(
-    doc,
-    PERSONAL_COPY_HINDI,
-    7.0,
-    noteY + FOOTER_NOTE_HEIGHT + 1.2,
-    196.0,
-    5.0,
-    'left',
-    true,
-    '#263247',
-  );
-  doc.setFont('LiberationSans', 'bold');
-  doc.setFontSize(5.6);
-  doc.setTextColor(38, 50, 71);
-  doc.text(
-    'PERSONAL RECORD - NOT ISSUED BY THE BANK · Generated ' + stamp,
-    7.0,
-    noteY + FOOTER_NOTE_HEIGHT + 5.3,
-  );
 
   doc.setFont('LiberationSans', 'bold');
   doc.setFontSize(6.3);
@@ -533,7 +501,7 @@ function paginate(doc: jsPDF, rows: StatementRow[]): StatementRow[][] {
 
 /**
  * Creates a fresh bilingual BOB World statement. Both scripts appear on the
- * title banner, all eight table columns, account fields and disclaimer/footer.
+ * title banner, all eight table columns, account fields and page numbering.
  * Page one has account details; continuation pages repeat the header/table.
  */
 export async function generateBobStatementPdf(options: BobStatementPdfOptions): Promise<Blob> {
@@ -558,8 +526,6 @@ export async function generateBobStatementPdf(options: BobStatementPdfOptions): 
   const opening = openingBalanceForRange(account, options.transactions, options.currentBalance, options.from);
   const rows = makeRows(options.transactions, opening, options.from, options.to);
   const pages = paginate(doc, rows);
-  const generatedAt = options.generatedAt || new Date();
-
   pages.forEach((pageRows, pageIndex) => {
     if (pageIndex > 0) doc.addPage();
     drawHeader(doc, options.from, options.to, headerArtwork);
@@ -573,8 +539,10 @@ export async function generateBobStatementPdf(options: BobStatementPdfOptions): 
       drawTableRow(doc, row, y, height, rowIndex % 2 === 1);
       y += height;
     });
-    drawFooter(doc, account, generatedAt, pageIndex + 1, pages.length, noteArtwork, bottomGradient);
+    drawFooter(doc, account, pageIndex + 1, pages.length, noteArtwork, bottomGradient);
   });
 
   return doc.output('blob');
 }
+
+[executed on device: Kishan (c4aa9a86-57f1-4320-a86d-0513b6434d61)]
