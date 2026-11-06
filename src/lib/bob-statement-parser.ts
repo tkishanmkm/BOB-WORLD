@@ -417,6 +417,13 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       customerAddress.match(/\b\d{6}\b/)?.[0] || '';
     const branchPin = fieldFromText(rightText, ['Branch PIN', 'PIN Code', 'Pincode']) ||
       branchAddress.match(/\b\d{6}\b/)?.[0] || '';
+    // Resolve account type only from the explicitly labelled Account Type field.
+    // Searching the entire statement text can match generic footer/help wording
+    // and incorrectly override a savings account as current.
+    const accountTypeName = fieldFromText(leftText, ['Account Type', 'Account Category']) || undefined;
+    const accountType = accountTypeName && /\bcurrent\b/i.test(accountTypeName) ? 'Current' :
+      accountTypeName && (/\bsaving(?:s)?\b|\bSBA\b/i.test(accountTypeName)) ? 'Saving' : undefined;
+
     const accountDetails: Partial<AccountDetailsType> = {
       name: fieldFromText(leftText, ['Account Name', 'Account Holder Name', 'Customer Name']),
       accountNumber,
@@ -432,9 +439,8 @@ export async function parseBobStatementPdf(input: PdfInput): Promise<ParsedBobSt
       nominee: fieldFromText(leftText, ['Nominee Name', 'Nominee']),
       ckycNumber: fieldFromText(leftText, ['CKYC Number', 'CKYC No']),
       customerId: fieldFromText(leftText, ['Customer ID', 'Customer Id', 'CIF ID', 'CIF Number']),
-      accountType: /\bcurrent\s+account\b/i.test(text) ? 'Current' :
-        /\bsaving(?:s)?\s+account\b|\bSBA\b/i.test(text) ? 'Saving' : undefined,
-      accountTypeName: fieldFromText(leftText, ['Account Type', 'Account Category']) || undefined,
+      accountType,
+      accountTypeName,
       statementOpeningBalance: openingBalance,
       statementPeriodFrom: period.from,
       statementPeriodTo: period.to,
