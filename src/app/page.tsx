@@ -1,11 +1,10 @@
-
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   INITIAL_ACCOUNT_DETAILS,
   ACCOUNT_DETAILS_STORAGE_KEY,
@@ -14,253 +13,310 @@ import {
   LOGIN_BANNER_KEY_3,
   LOGIN_BANNER_KEY_4,
   LOGIN_BANNER_KEY_5,
-} from '@/lib/constants';
-import type { AccountDetailsType } from '@/lib/types';
-import { ChevronDown, Lock, QrCode, Eye, MoreHorizontal, Smartphone, CreditCard, Send, HelpCircle, ScanFace, Dot } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { SplashScreen } from '@/components/layout/splash-screen';
-import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from '@/lib/indexed-db';
+} from "@/lib/constants";
+import type { AccountDetailsType } from "@/lib/types";
+import {
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  QrCode,
+  Eye,
+  MoreHorizontal,
+  Smartphone,
+  CreditCard,
+  Send,
+  HelpCircle,
+  ScanFace,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys } from "@/lib/indexed-db";
 
 const PinInputCircle: React.FC<{ value: string }> = ({ value }) => (
-  <div className={cn(
-    "h-5 w-5 rounded-full border-2 border-blue-800 flex items-center justify-center",
-    value ? "bg-blue-800" : "bg-transparent"
-  )}>
-  </div>
+  <span
+    aria-hidden="true"
+    className={cn(
+      "block h-[14px] w-[14px] rounded-full border-[2px] border-[#244d78] transition-colors",
+      value ? "bg-[#244d78]" : "bg-white"
+    )}
+  />
 );
 
+type LoginActionProps = {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+};
+
+function LoginAction({ icon: Icon, label, onClick }: LoginActionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center text-[#244d78]"
+    >
+      <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white shadow-[0_4px_18px_rgba(24,48,75,0.10)]">
+        <Icon className="h-7 w-7 stroke-[2.2]" />
+      </span>
+      <span className="max-w-[100px] text-[13px] font-semibold leading-[1.2]">{label}</span>
+    </button>
+  );
+}
+
+function FooterAction({ icon: Icon, label, onClick }: LoginActionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-w-0 flex-col items-center justify-start gap-2 px-1 text-center text-[#244d78]"
+    >
+      <Icon className="h-8 w-8 stroke-[2]" />
+      <span className="text-[12px] font-semibold leading-tight">{label}</span>
+    </button>
+  );
+}
+
 export default function LoginPage() {
-  const [showSplash, setShowSplash] = useState(true);
   const [accountDetails, setAccountDetails] = useState<AccountDetailsType>(INITIAL_ACCOUNT_DETAILS);
-  const [pin, setPin] = useState<string[]>(['', '', '', '']);
+  const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [loginBanners, setLoginBanners] = useState<string[]>([]);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
-
   useEffect(() => {
     let cancelled = false;
     void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
-    if (cancelled) return;
-    const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-    if (storedDetails) {
-      try {
-        setAccountDetails(JSON.parse(storedDetails));
-      } catch (e) {
+      if (cancelled) return;
+      const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+      if (storedDetails) {
+        try {
+          setAccountDetails({ ...INITIAL_ACCOUNT_DETAILS, ...JSON.parse(storedDetails) });
+        } catch {
+          setAccountDetails(INITIAL_ACCOUNT_DETAILS);
+        }
+      } else {
         setAccountDetails(INITIAL_ACCOUNT_DETAILS);
       }
-    } else {
-      setAccountDetails(INITIAL_ACCOUNT_DETAILS);
-    }
-    
-    const bannerKeys = [LOGIN_BANNER_KEY_1, LOGIN_BANNER_KEY_2, LOGIN_BANNER_KEY_3, LOGIN_BANNER_KEY_4, LOGIN_BANNER_KEY_5];
-    const loadedBanners = bannerKeys.map(key => {
-      const storedBanner = localStorage.getItem(key);
-      if (storedBanner && storedBanner.startsWith('data:image')) {
-        return storedBanner;
-      }
-      return 'https://placehold.co/600x200.png'; // Default placeholder
-    }).filter(banner => banner !== 'https://placehold.co/600x200.png'); // Filter out placeholders if you only want to show uploaded images
 
-     if(loadedBanners.length > 0) {
-      setLoginBanners(loadedBanners);
-    } else {
-      setLoginBanners(['https://placehold.co/600x200.png?text=Banner+1']);
-    }
+      const bannerKeys = [
+        LOGIN_BANNER_KEY_1,
+        LOGIN_BANNER_KEY_2,
+        LOGIN_BANNER_KEY_3,
+        LOGIN_BANNER_KEY_4,
+        LOGIN_BANNER_KEY_5,
+      ];
+      const loadedBanners = bannerKeys
+        .map((key) => localStorage.getItem(key))
+        .filter((banner): banner is string => Boolean(banner?.startsWith("data:image")));
 
-     if (inputRefs.current[0]) inputRefs.current[0]?.focus();
-    }).catch(error => console.error('Could not restore local app data:', error));
-    return () => { cancelled = true; };
+      setLoginBanners(loadedBanners.length > 0 ? loadedBanners : ["https://placehold.co/600x200.png?text=Banking+Made+Simple"]);
+      inputRefs.current[0]?.focus();
+    }).catch((storageError) => console.error("Could not restore local app data:", storageError));
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  
-  useEffect(() => {
-    if (loginBanners.length > 1) {
-      const sliderInterval = setInterval(() => {
-        setCurrentBannerIndex(prevIndex => (prevIndex + 1) % loginBanners.length);
-      }, 1000); // 1 second interval
 
-      return () => clearInterval(sliderInterval);
-    }
+  useEffect(() => {
+    if (loginBanners.length <= 1) return;
+    const sliderInterval = window.setInterval(() => {
+      setCurrentBannerIndex((index) => (index + 1) % loginBanners.length);
+    }, 5000);
+    return () => window.clearInterval(sliderInterval);
   }, [loginBanners.length]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 4000); // 4 seconds
-    return () => clearTimeout(timer);
-  }, []);
-
 
   const handlePinChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
 
-    const newPin = [...pin];
-    newPin[index] = value;
-    setPin(newPin);
+    const nextPin = [...pin];
+    nextPin[index] = value;
+    setPin(nextPin);
+    setError(null);
 
-    if (value && index < 3) {
-      inputRefs.current[index + 1]?.focus();
-    } else if (!value && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+    if (value && index < 3) inputRefs.current[index + 1]?.focus();
+    else if (!value && index > 0) inputRefs.current[index - 1]?.focus();
 
-    if (newPin.every(digit => digit !== '') && newPin.join('').length === 4) {
+    if (nextPin.every((digit) => digit !== "") && nextPin.join("").length === 4) {
       const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
       let details: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS };
       try {
         if (storedDetails) details = { ...details, ...JSON.parse(storedDetails) };
-      } catch (error) {
-        console.error('Could not read account details while recording login:', error);
+      } catch (storageError) {
+        console.error("Could not read account details while recording login:", storageError);
       }
-      details.lastLogin = new Intl.DateTimeFormat('en-IN', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: true, timeZone: 'Asia/Kolkata', timeZoneName: 'short',
+      details.lastLogin = new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+        timeZone: "Asia/Kolkata",
+        timeZoneName: "short",
       }).format(new Date());
       localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(details));
-      void persistStorageKeys(BOB_WORLD_STATE_KEYS).catch(error =>
-        console.error('Could not persist login timestamp to IndexedDB:', error)
+      void persistStorageKeys(BOB_WORLD_STATE_KEYS).catch((storageError) =>
+        console.error("Could not persist login timestamp to IndexedDB:", storageError)
       );
       setAccountDetails(details);
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+  const handleKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !pin[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const ActionButton: React.FC<{ icon: React.ElementType; label: string; href?: string }> = ({ icon: Icon, label, href }) => (
-    <div className="flex flex-col items-center text-center group w-1/3">
-      <Button variant="ghost" className="h-auto p-0 flex flex-col items-center">
-        <div className="p-3 mb-1.5 bg-muted rounded-full group-hover:bg-primary/10 transition-colors">
-          <Icon className="h-6 w-6 text-primary group-hover:text-primary" />
-        </div>
-        <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors leading-tight">{label}</p>
-      </Button>
-    </div>
-  );
-
-  const BottomAction: React.FC<{ icon: React.ElementType; label: string; href?: string, iconColor?: string }> = ({ icon: Icon, label, href, iconColor = "text-primary" }) => (
-    <div className="flex flex-col items-center text-center group">
-       <Button variant="ghost" className="h-auto p-0 flex flex-col items-center">
-        <div className={cn("p-3 mb-1 bg-card rounded-lg shadow-sm", iconColor === "text-red-600" ? "bg-red-100" : "bg-primary/10" )}>
-            <Icon className={cn("h-6 w-6", iconColor)} />
-        </div>
-        <p className="text-xs font-medium text-foreground">{label}</p>
-      </Button>
-    </div>
-  );
-
+  const firstName = accountDetails.name?.trim().split(/\s+/)[0] || "Customer";
+  const fullName = accountDetails.name?.trim() || "Customer";
 
   return (
-    <>
-      {showSplash && <SplashScreen />}
-
-      {!showSplash && (
-    <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 overflow-y-auto p-4 pt-6 space-y-5">
-        <div className="flex items-center justify-between gap-4 min-h-14">
-          <img src="/assets/branding/bob-world-logo.png" alt="BOB World" className="h-12 w-[112px] object-contain object-left" />
-          <img src="/assets/branding/bank-of-baroda-logo.png" alt="Bank of Baroda" className="h-9 w-[148px] object-contain object-right" />
-        </div>
-
-        <div className="rounded-lg overflow-hidden shadow-md relative h-48">
-          {loginBanners.map((src, index) => (
-             <Image
-              key={src + index}
-              src={src}
-              alt={`Login Banner ${index + 1}`}
-              fill
-              className={cn(
-                "w-full h-full object-cover absolute transition-opacity duration-500 ease-in-out",
-                index === currentBannerIndex ? "opacity-100" : "opacity-0"
-              )}
-              data-ai-hint="government cybercrime awareness"
-              priority={index === 0}
+    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-white text-[#244d78]">
+      <main className="flex-1">
+        <section className="rounded-b-[30px] bg-white px-5 pb-7 pt-8 shadow-[0_14px_28px_rgba(30,55,85,0.07)]">
+          <div className="mx-auto flex h-[72px] w-full max-w-[360px] items-center justify-center gap-5">
+            <img
+              src="/assets/branding/bob-world-logo.png"
+              alt="BOB World"
+              className="h-[54px] w-[112px] object-contain"
             />
-          ))}
-           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2">
-            {loginBanners.map((_, index) => (
-              <Dot
-                key={`dot-${index}`}
+            <img
+              src="/assets/branding/bank-of-baroda-logo.png"
+              alt="Bank of Baroda"
+              className="h-[50px] w-[190px] object-contain"
+            />
+          </div>
+
+          <div className="relative mt-3 h-[132px] w-full overflow-hidden rounded-[18px] border border-[#e6e8eb] bg-[#f7f7f7]">
+            {loginBanners.map((src, index) => (
+              <Image
+                key={src + index}
+                src={src}
+                alt={`Login banner ${index + 1}`}
+                fill
+                unoptimized={src.startsWith("data:")}
                 className={cn(
-                  "h-4 w-4 text-white/50 transition-colors",
-                  index === currentBannerIndex && "text-white"
+                  "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
+                  index === currentBannerIndex ? "opacity-100" : "opacity-0"
                 )}
+                priority={index === 0}
               />
             ))}
           </div>
-        </div>
 
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-foreground">Hi {accountDetails.name.split(' ')[0]}!</h1>
-          <Button variant="ghost" className="text-sm text-primary">
-            EN <ChevronDown className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
+          {loginBanners.length > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-[5px]" aria-label="Login banner pages">
+              {loginBanners.map((_, index) => (
+                <button
+                  key={`banner-dot-${index}`}
+                  type="button"
+                  aria-label={`Show banner ${index + 1}`}
+                  onClick={() => setCurrentBannerIndex(index)}
+                  className={cn(
+                    "h-[4px] w-[18px] rounded-full transition-colors",
+                    index === currentBannerIndex ? "bg-[#244d78]" : "bg-[#c4ccd5]"
+                  )}
+                />
+              ))}
+            </div>
+          )}
 
-        <Card className="p-6 rounded-xl shadow-lg bg-card">
-          <p className="text-center text-sm text-muted-foreground mb-1">Use login PIN or face ID</p>
-          <div className="flex items-center justify-center space-x-3 my-4">
+          <div className="mt-7 flex min-h-[44px] items-center justify-between gap-3">
+            <h1 className="truncate text-[27px] font-bold leading-tight tracking-[-0.5px] text-[#244d78]">
+              Hi {fullName}!
+            </h1>
+            <Button variant="ghost" className="shrink-0 gap-1 px-1 text-[16px] font-bold text-[#244d78]">
+              <span className="text-[11px]">अ</span>
+              EN
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-[430px] px-5 pb-6 pt-8">
+          <p className="mb-3 text-center text-[17px] font-bold text-[#244d78]">
+            Use login PIN or face ID
+          </p>
+
+          <div
+            className="mx-auto flex h-[58px] max-w-[280px] items-center justify-center gap-4 rounded-full bg-white pl-5 pr-1 shadow-[0_5px_18px_rgba(25,45,70,0.10)]"
+            onClick={() => inputRefs.current[pin.findIndex((digit) => digit === "") === -1 ? 3 : pin.findIndex((digit) => digit === "")]?.focus()}
+          >
             {pin.map((digit, index) => (
-              <div key={index} className="relative">
+              <div key={index} className="relative flex h-8 w-7 items-center justify-center">
                 <Input
-                  ref={el => { inputRefs.current[index] = el; }}
+                  ref={(element) => { inputRefs.current[index] = element; }}
                   type="password"
                   inputMode="numeric"
                   pattern="[0-9]*"
+                  autoComplete="off"
                   maxLength={1}
                   value={digit}
-                  onChange={(e) => handlePinChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="absolute opacity-0 w-6 h-6 z-10 cursor-default"
+                  onChange={(event) => handlePinChange(index, event.target.value)}
+                  onKeyDown={(event) => handleKeyDown(index, event)}
+                  aria-label={`Login PIN digit ${index + 1}`}
+                  className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
                 />
                 <PinInputCircle value={digit} />
               </div>
             ))}
-            <Button variant="outline" size="icon" className="h-12 w-12 rounded-full border-2 border-primary text-primary">
+            <button
+              type="button"
+              aria-label="Use face ID"
+              onClick={() => setError("Face ID is not available on this device.")}
+              className="ml-1 flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full bg-[#244d78] text-white shadow-sm"
+            >
               <ScanFace className="h-7 w-7" />
-            </Button>
+            </button>
           </div>
-          {error && <p className="text-sm text-red-500 text-center mt-2">{error}</p>}
-          <div className="text-center">
-            <Button variant="link" className="text-sm text-primary font-medium">
-              <Lock className="h-4 w-4 mr-1.5" /> Unlock/Forgot login PIN?
-            </Button>
+
+          {error && <p role="alert" className="mt-2 text-center text-xs text-red-600">{error}</p>}
+
+          <button
+            type="button"
+            onClick={() => router.push("/change-login-pin")}
+            className="mx-auto mt-4 flex items-center justify-center gap-2 text-[16px] font-bold text-[#244d78]"
+          >
+            <Lock className="h-5 w-5 stroke-[1.8]" />
+            Unlock/Forgot login PIN?
+          </button>
+
+          <div className="mt-7 flex items-start justify-center gap-5">
+            <LoginAction icon={QrCode} label="Scan QR" onClick={() => router.push("/scan")} />
+            <LoginAction icon={Eye} label="Quick view balance" onClick={() => router.push("/all-accounts")} />
+            <LoginAction icon={MoreHorizontal} label="More" onClick={() => router.push("/more")} />
           </div>
-        </Card>
 
+          <button
+            type="button"
+            onClick={() => router.push("/digital-loan")}
+            className="mx-auto mt-6 flex items-center justify-center text-[14px] font-bold text-[#244d78] underline underline-offset-2"
+          >
+            Apply for digital loans
+          </button>
 
-        <div className="flex justify-around items-start pt-2 pb-2">
-          <ActionButton icon={QrCode} label="Scan QR" />
-          <ActionButton icon={Eye} label="Quick view balance" />
-          <ActionButton icon={MoreHorizontal} label="More" />
-        </div>
+          <div className="mt-7 flex justify-center">
+            <ChevronUp className="h-7 w-10 rotate-180 text-[#c5cbd3]" />
+          </div>
+        </section>
       </main>
 
-      <footer className="bg-muted/60 border-t p-3 shadow-top sticky bottom-0">
-        <div className="grid grid-cols-4 gap-2">
-            <BottomAction icon={Smartphone} label="Cash on mobile"/>
-            <BottomAction icon={CreditCard} label="Recharge & bill pay" iconColor="text-red-600"/>
-            <BottomAction icon={Send} label="Transfer"/>
-            <BottomAction icon={HelpCircle} label="Need help?"/>
+      <footer className="mt-auto rounded-t-[30px] bg-white px-3 pb-5 pt-5 shadow-[0_-8px_28px_rgba(20,40,65,0.08)]">
+        <div className="mx-auto grid w-full max-w-[430px] grid-cols-4 gap-2">
+          <FooterAction icon={Smartphone} label="Cash on mobile" onClick={() => router.push("/recharge")} />
+          <FooterAction icon={CreditCard} label="Recharge & bill pay" onClick={() => router.push("/bill-pay")} />
+          <FooterAction icon={Send} label="Fund Transfer" onClick={() => router.push("/fund-transfer")} />
+          <FooterAction icon={HelpCircle} label="Need help?" onClick={() => router.push("/help")} />
         </div>
+        <p className="mt-3 text-center text-[11px] font-semibold text-[#929292]">
+          v3.9.0 © Bank of Baroda. All rights reserved.
+        </p>
       </footer>
     </div>
-      )}
-    </>
   );
 }
-
-const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, children, ...props }) => (
-  <div className={cn("bg-card p-4 rounded-lg shadow", className)} {...props}>
-    {children}
-  </div>
-);
-
-    
