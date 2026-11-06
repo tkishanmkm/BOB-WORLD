@@ -7,6 +7,7 @@ import { ActionButtonsGroup } from "@/components/dashboard/action-buttons-group"
 import { IconGridSection } from "@/components/dashboard/icon-grid-section";
 import { INITIAL_BALANCE, INITIAL_ACCOUNT_DETAILS } from "@/lib/constants";
 import type { TransactionType, AccountDetailsType } from '@/lib/types';
+import { getAccountTypeLabel } from '@/lib/account-type';
 import { User, Smartphone, Landmark, Percent, ShoppingCart, Bus, Lock, FileText, Send, BookOpenText, TrendingUp, ConciergeBell, Plane, LineChart, CreditCard, BookMarked, Gift, CircleDollarSign, Award } from 'lucide-react';
 
 
@@ -73,7 +74,7 @@ export default function DashboardPage() {
   }, []);
 
   const accountNumberSuffix = accountDetails.accountNumber.slice(-4);
-  const accountType = accountDetails.accountType ? `${accountDetails.accountType} account` : 'Current account';
+  const accountType = getAccountTypeLabel(accountDetails);
 
   return (
     <div className="space-y-6 pb-8">
