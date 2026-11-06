@@ -8,6 +8,17 @@ export interface StatementDownloadAssets {
   bankLogo?: string | null;
 }
 
+async function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the statement brand asset.'));
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('Could not encode the statement brand asset.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
  * Loads the logo assets extracted from the reference statement as the
  * first-run defaults. User-uploaded Settings logos always take precedence.
