@@ -267,48 +267,48 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
   doc.roundedRect(x + 0.08, y + 10.0, width - 0.16, 70.2, 1.7, 1.7, 'FD');
 
   const leftX = 9.15;
-  const rightEdge = 201.7;
-  const rightWidth = 82.0;
+  const rightX = 119.7;
   const leftWidth = 80.0;
+  const rightWidth = 82.0;
+  const rowStart = 75.4;
+  const rowGap = 17.0;
   const rows = [
-    { y: 76.55, hi: 'ग्राहक का नाम', en: 'Account Name', value: account.name || '-' },
-    { y: 94.7, hi: 'खाता संख्या', en: 'Account Number', value: account.accountNumber || '-' },
-    { y: 106.7, hi: 'खाता प्रकार', en: 'Account Type', value: account.accountTypeName || account.accountType || '-' },
-    { y: 118.8, hi: 'ग्राहक का पता', en: 'Customer Address', value: [account.customerAddress, account.customerCity, account.customerPin].filter(Boolean).join(', ') || '-' },
+    { hi: 'ग्राहक का नाम', en: 'Account Name', value: account.name || '-', maxLines: 1 },
+    { hi: 'खाता संख्या', en: 'Account Number', value: account.accountNumber || '-', maxLines: 1 },
+    { hi: 'खाता प्रकार', en: 'Account Type', value: account.accountTypeName || account.accountType || 'ACCOUNT TYPE NOT SET', maxLines: 1 },
+    { hi: 'ग्राहक का पता', en: 'Customer Address', value: [account.customerAddress, account.customerCity, account.customerPin].filter(Boolean).join(', ') || '-', maxLines: 4 },
   ];
   const rightRows = [
-    { y: 76.55, hi: 'शाखा का नाम', en: 'Branch Name', value: account.branchName || '-' },
-    { y: 94.7, hi: 'आईएफएससी कोड', en: 'IFSC Code', value: account.ifscCode || '-' },
-    { y: 106.7, hi: 'एमआईसीआर कोड', en: 'MICR Code', value: account.micrCode || '-' },
-    { y: 118.8, hi: 'शाखा का पता', en: 'Branch Address', value: [account.branchAddress, account.branchCity, account.branchPin].filter(Boolean).join(', ') || '-' },
+    { hi: 'शाखा का नाम', en: 'Branch Name', value: account.branchName || '-', maxLines: 2 },
+    { hi: 'आईएफएससी कोड', en: 'IFSC Code', value: account.ifscCode || '-', maxLines: 1 },
+    { hi: 'एमआईसीआर कोड', en: 'MICR Code', value: account.micrCode || '-', maxLines: 1 },
+    { hi: 'शाखा का पता', en: 'Branch Address', value: [account.branchAddress, account.branchCity, account.branchPin].filter(Boolean).join(', ') || '-', maxLines: 4 },
   ];
 
-  const label = (_hi: string, en: string, xPos: number, yPos: number): void => {
-    doc.setFont('LiberationSans', 'normal');
-    doc.setFontSize(5.15);
-    doc.setTextColor(35, 35, 35);
-    doc.text('/ ' + en.replace(/^\s*\/\s*/, ''), xPos, yPos + 2.9);
+  const label = (hi: string, en: string, xPos: number, yPos: number, maxWidth: number): void => {
+    // Render the complete bilingual label as one shaped Devanagari-aware line.
+    // Canvas applies proper matra shaping; English follows the slash on that same line.
+    addHindi(doc, hi + ' / ' + en, xPos, yPos, maxWidth, 5.15, 'left', false, '#232323');
   };
-  const value = (text: string, xPos: number, yPos: number, maxWidth: number, align: 'left' | 'right', maxLines = 4): void => {
+  const value = (text: string, xPos: number, yPos: number, maxWidth: number, maxLines: number): void => {
     doc.setFont('LiberationSans', 'bold');
     doc.setFontSize(7.8);
     doc.setTextColor(18, 18, 18);
     const lines = doc.splitTextToSize(text.trim() || '-', maxWidth).slice(0, maxLines);
-    doc.text(lines, xPos, yPos, { align, lineHeightFactor: 1.0 });
+    doc.text(lines, xPos, yPos, { align: 'left', lineHeightFactor: 1.0 });
   };
 
   rows.forEach((field, index) => {
-    label(field.hi, field.en, leftX, field.y);
-    if (index < 3) value(field.value, leftX, field.y + 5.0, leftWidth, 'left', 1);
-    else value(field.value, leftX, field.y + 6.0, leftWidth, 'left', 4);
+    const rowY = rowStart + index * rowGap;
+    label(field.hi, field.en, leftX, rowY, leftWidth);
+    value(field.value, leftX, rowY + 5.2, leftWidth, field.maxLines);
   });
   rightRows.forEach((field, index) => {
-    const xPos = rightEdge - rightWidth;
-    label(field.hi, field.en, xPos, field.y);
-    value(field.value, rightEdge, field.y + (index === 3 ? 6.0 : 5.0), rightWidth, 'right', index === 0 ? 2 : index === 3 ? 4 : 1);
+    const rowY = rowStart + index * rowGap;
+    label(field.hi, field.en, rightX, rowY, rightWidth);
+    value(field.value, rightX, rowY + 5.2, rightWidth, field.maxLines);
   });
 }
-
 
 
 function columnPositions(): number[] {
