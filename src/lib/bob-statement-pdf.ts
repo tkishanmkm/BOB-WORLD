@@ -14,7 +14,7 @@ export interface BobStatementPdfOptions {
 }
 
 interface StatementRow {
-  serial: number;
+  serial: string;
   transactionDate: string;
   valueDate: string;
   description: string;
@@ -46,7 +46,7 @@ const HINDI_IMAGE_CACHE = new Map<string, { data: string; height: number }>();
 
 const DEFAULT_NOTE_HINDI = 'नोट : हम आपको यह सूचित करते हैं कि इसमें किसी प्रकार की विसंगति पाए जाने पर अपनी मूल शाखा से संपर्क करें अथवा बॉब वर्ल्ड ऐप की सहायता से अपनी शिकायत दर्ज करें।';
 const DEFAULT_NOTE_ENGLISH = 'Note: In case you find any discrepancy, we advise you to take it up with your base branch or raise a complaint using bob World.';
-const PERSONAL_COPY_HINDI = 'यह व्यक्तिगत प्रति है, जिसे इस ऐप में उपलब्ध जानकारी के आधार पर तैयार किया गया है। यह बैंक द्वारा जारी या प्रमाणित विवरण नहीं है।';
+const PERSONAL_COPY_HINDI = 'यह व्यक्तिगत विवरण इस ऐप में उपलब्ध जानकारी के आधार पर तैयार किया गया है।';
 
 const money = (value: number): string => new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,
@@ -246,13 +246,13 @@ function drawHeader(doc: jsPDF, from: Date, to: Date, headerArtwork: string): vo
     'FAST',
   );
 
-  const hindiTitle = 'व्यक्तिगत लेनदेन विवरण ' + dateText(from) + ' से ' + dateText(to) + ' तक';
+  const hindiTitle = 'दिनांक ' + dateText(from) + ' से ' + dateText(to) + ' तक की खाता विवरणी';
   addHindi(doc, hindiTitle, 17.0, 41.0, 176.0, 13.0, 'center', true, '#ffffff');
 
   doc.setFont('LiberationSans', 'bold');
   doc.setFontSize(11.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('Personal Transaction Report ' + dateText(from) + ' to ' + dateText(to), PAGE_WIDTH / 2, 51.0, { align: 'center' });
+  doc.text('Account Statement from ' + dateText(from) + ' to ' + dateText(to), PAGE_WIDTH / 2, 51.0, { align: 'center' });
 
   // A visible provenance strip replaces the source PDF's bank-origin statement line.
   doc.setFillColor(27, 48, 83);
@@ -260,7 +260,7 @@ function drawHeader(doc: jsPDF, from: Date, to: Date, headerArtwork: string): vo
   doc.setFont('LiberationSans', 'bold');
   doc.setFontSize(6.3);
   doc.setTextColor(255, 255, 255);
-  doc.text('PERSONAL COPY - NOT ISSUED OR CERTIFIED BY THE BANK', PAGE_WIDTH / 2, 57.3, { align: 'center' });
+  doc.text('PERSONAL RECORD - NOT ISSUED BY THE BANK', PAGE_WIDTH / 2, 57.3, { align: 'center' });
 }
 
 function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork: string): void {
@@ -435,7 +435,7 @@ function drawFooter(
   doc.setFontSize(5.6);
   doc.setTextColor(38, 50, 71);
   doc.text(
-    'PERSONAL COPY - NOT ISSUED OR CERTIFIED BY THE BANK · Prepared ' + stamp,
+    'PERSONAL RECORD - NOT ISSUED BY THE BANK · Generated ' + stamp,
     7.0,
     noteY + FOOTER_NOTE_HEIGHT + 5.3,
   );
@@ -478,7 +478,7 @@ function makeRows(
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const rows: StatementRow[] = [{
-    serial: 1,
+    serial: '1',
     transactionDate: dateText(from),
     valueDate: '-',
     description: 'Opening Balance',
@@ -494,7 +494,7 @@ function makeRows(
       ? transaction.balanceAfter
       : roundMoney(running + movement(transaction));
     rows.push({
-      serial: rows.length + 1,
+      serial: String(rows.length + 1),
       transactionDate: dateText(transaction.date),
       valueDate: transaction.valueDate ? dateText(transaction.valueDate) : dateText(transaction.date),
       description: transaction.description || '-',
@@ -504,6 +504,14 @@ function makeRows(
       balance: money(running),
     });
   }
+  const totalDebit = roundMoney(selected.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0));
+  const totalCredit = roundMoney(selected.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0));
+  const closingBalance = roundMoney(running);
+  rows.push(
+    { serial: '-', transactionDate: '-', valueDate: '-', description: 'TOTAL DEBIT', chequeNumber: '-', debit: money(totalDebit), credit: '-', balance: '-' },
+    { serial: '-', transactionDate: '-', valueDate: '-', description: 'TOTAL CREDIT', chequeNumber: '-', debit: '-', credit: money(totalCredit), balance: '-' },
+    { serial: '-', transactionDate: '-', valueDate: '-', description: 'CLOSING BALANCE', chequeNumber: '-', debit: '-', credit: '-', balance: money(closingBalance) },
+  );
   return rows;
 }
 
