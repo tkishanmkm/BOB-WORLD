@@ -169,16 +169,13 @@ export default function PassbookPage() {
       });
       const lastFour = accountDetails.accountNumber.replace(/\D/g, '').slice(-4) || 'XXXX';
       const fileName = 'BOBWORLD_STMT_XX' + lastFour + '_' + format(new Date(), 'ddMMyyyy') + '.pdf';
-      const savedLocation = await saveStatementPdfAndAssets(pdfBlob, fileName, {
-        bobWorldLogo,
-        bankLogo,
-      });
+      const savedLocation = await saveStatementPdfAndAssets(pdfBlob, fileName);
       const shareSheetOpened = savedLocation.includes('share sheet');
       const shareSheetCancelled = savedLocation === 'Share sheet closed without saving';
       toast({
         title: shareSheetCancelled ? 'Statement not saved' : shareSheetOpened ? 'Save statement to Files' : 'Statement downloaded',
         description: shareSheetOpened
-          ? fileName + ' and its logo assets are ready in the share sheet. Choose Save to Files.'
+          ? fileName + ' is ready in the share sheet. Choose Save to Files.'
           : shareSheetCancelled
             ? 'The share sheet was closed before a file was saved.'
             : fileName + ' saved to ' + savedLocation + '.',
