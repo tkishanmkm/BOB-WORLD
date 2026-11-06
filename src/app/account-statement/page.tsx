@@ -138,8 +138,9 @@ export default function AccountStatementPage() {
         bobWorldLogo,
         bankLogo,
       });
-      const lastFour = accountDetails.accountNumber.replace(/\D/g, '').slice(-4) || 'XXXX';
-      const fileName = 'BOBWORLD_STMT_XX' + lastFour + '_' + format(new Date(), 'ddMMyyyy') + '.pdf';
+      const statementAccountDigits = String(accountDetails.accountNumber || '').replace(/\D/g, '');
+      if (!statementAccountDigits) throw new Error('Add a valid account number in Settings before downloading the statement.');
+      const fileName = statementAccountDigits + '.pdf';
 
       const savedLocation = await savePdfToDownloads(pdfBlob, fileName);
       toast({

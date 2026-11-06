@@ -11,13 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import type { TransactionType, PayeeType, AccountDetailsType } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
-import { cn } from "@/lib/utils";
-import { FileDown } from 'lucide-react';
-import { ensureStatementBrandAssets, savePdfToDownloads } from '@/lib/statement-download';
-import { useEffect, useState } from 'react';
+import { Share2, Download, Check } from 'lucide-react';
+import { savePdfToDownloads } from '@/lib/statement-download';
+import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
-import { STATEMENT_LOGO_KEY } from '@/lib/constants';
 
 interface TransactionReceiptDialogProps {
   open: boolean;
@@ -27,12 +25,7 @@ interface TransactionReceiptDialogProps {
   remitterAccountDetails: AccountDetailsType | null;
 }
 
-const DetailRow: React.FC<{ label: string; value: string | React.ReactNode; labelCols?: string; valueCols?: string }> = ({ label, value, labelCols = "col-span-5", valueCols = "col-span-7" }) => (
-  <div className="grid grid-cols-12 py-1.5 text-sm">
-    <p className={cn("text-muted-foreground text-left", labelCols)}>{label}</p>
-    <div className={cn("text-foreground font-medium text-left break-words", valueCols)}>{value}</div>
-  </div>
-);
+
 
 function belowThousand(value: number): string {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -80,21 +73,27 @@ function amountInWords(value: number): string {
     (paise ? ' and ' + belowThousand(paise) + ' Paise' : '') + ' Only';
 }
 
-function toPdfImageType(dataUri: string): 'PNG' | 'JPEG' | null {
-  const prefix = dataUri.slice(0, 80).toLowerCase();
-  if (prefix.includes('image/png')) return 'PNG';
-  if (prefix.includes('image/jpeg') || prefix.includes('image/jpg')) return 'JPEG';
-  return null;
-}
 
 function maskReceiptAccount(value: string | undefined): string {
   const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return 'N/A';
-  return 'X'.repeat(Math.max(4, digits.length - 4)) + digits.slice(-4);
+  return 'XXXX' + digits.slice(-4);
 }
 
 const bankIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96"><path fill="#5f6874" d="M12 2 2 7v2h20V7L12 2Zm-7 9h2v7H5v-7Zm6 0h2v7h-2v-7Zm6 0h2v7h-2v-7ZM3 20h18v2H3v-2Z"/></svg>';
 const rupeeIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" width="320" height="512"><path fill="#23282e" d="M32 32h256c17.7 0 32 14.3 32 32s-14.3 32-32 32h-56c13.4 13.8 22.8 31.9 26.5 52H288c17.7 0 32 14.3 32 32s-14.3 32-32 32h-29.5c-13.1 58.7-62.5 103-122.7 108.4l145.1 104.8c14.4 10.4 17.7 30.4 7.3 44.7-10.4 14.4-30.4 17.7-44.7 7.3l-224-162c-11.4-8.2-16.2-22.8-11.9-36.2C12 265.6 24.6 256 39 256h73c33.4 0 62.2-18.6 77.1-46H32c-17.7 0-32-14.3-32-32s14.3-32 32-32h157.1c-14.9-27.4-43.7-46-77.1-46H32C14.3 100 0 85.7 0 68s14.3-36 32-36Z"/></svg>';
+
+async function loadPublicPngDataUri(path: string): Promise<string> {
+  const response = await fetch(path, { cache: 'force-cache' });
+  if (!response.ok) throw new Error('Could not load receipt artwork: ' + path);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not prepare receipt artwork.'));
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read receipt artwork.'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 async function svgToPngDataUrl(svg: string, width: number, height: number): Promise<string> {
   const image = new window.Image();
@@ -125,16 +124,7 @@ export function TransactionReceiptDialog({
 }: TransactionReceiptDialogProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [receiptLogo, setReceiptLogo] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    let cancelled = false;
-    ensureStatementBrandAssets().then(assets => {
-      if (!cancelled) setReceiptLogo(assets.bobWorldLogo || localStorage.getItem(STATEMENT_LOGO_KEY));
-    }).catch(error => console.warn('Receipt logo could not be loaded:', error));
-    return () => { cancelled = true; };
-  }, []);
 
   const parsedDate = transaction ? parseISO(transaction.date) : new Date(Number.NaN);
   const formattedDateTime = transaction
@@ -172,32 +162,16 @@ export function TransactionReceiptDialog({
       for (let x = ticketX + 4; x < ticketX + ticketWidth - 2; x += 8) doc.circle(x, ticketY + ticketHeight, 2.25, 'F');
       let y = 14;
 
-      const defaults = await ensureStatementBrandAssets();
-      const logo = localStorage.getItem(STATEMENT_LOGO_KEY) || defaults.bobWorldLogo;
-      setReceiptLogo(logo || null);
-      if (logo) {
-        try {
-          const type = toPdfImageType(logo);
-          if (type) {
-            const info = doc.getImageProperties(logo);
-            const scale = Math.min(42 / info.width, 17 / info.height);
-            const width = info.width * scale;
-            const height = info.height * scale;
-            doc.addImage(logo, type, (pageWidth - width) / 2, y, width, height, undefined, 'FAST');
-            y += height + 6;
-          }
-        } catch (error) {
-          console.warn('BOB World logo could not be embedded in receipt:', error);
-        }
-      } else {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(22);
-        doc.setTextColor(235, 104, 54);
-        doc.text('bob', pageWidth / 2, y + 9, { align: 'center' });
-        doc.setFontSize(9);
-        doc.text('World', pageWidth / 2, y + 15, { align: 'center' });
-        y += 20;
-      }
+      const [bankOfBarodaLogo, bobWorldLogo] = await Promise.all([
+        loadPublicPngDataUri('/assets/branding/bank-of-baroda-monochrome.png'),
+        loadPublicPngDataUri('/assets/branding/bob-world-logo.png'),
+      ]);
+      const bankInfo = doc.getImageProperties(bankOfBarodaLogo);
+      const bankScale = Math.min(62 / bankInfo.width, 18 / bankInfo.height);
+      const bankWidth = bankInfo.width * bankScale;
+      const bankHeight = bankInfo.height * bankScale;
+      doc.addImage(bankOfBarodaLogo, 'PNG', (pageWidth - bankWidth) / 2, y, bankWidth, bankHeight, undefined, 'FAST');
+      y += bankHeight + 5;
 
       doc.setFillColor(32, 178, 145);
       doc.circle(pageWidth / 2, y + 3.5, 5.5, 'F');
@@ -209,7 +183,7 @@ export function TransactionReceiptDialog({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(18);
       doc.setTextColor(32, 55, 83);
-      doc.text('Transfer record saved', pageWidth / 2, y + 4, { align: 'center' });
+      doc.text('Transaction successful', pageWidth / 2, y + 4, { align: 'center' });
       y += 10;
 
       doc.setFont('helvetica', 'normal');
@@ -254,20 +228,14 @@ export function TransactionReceiptDialog({
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(35, 40, 46);
       const senderWidth = doc.getTextWidth(senderNumber);
-      if (logo) {
-        try {
-          const type = toPdfImageType(logo);
-          if (type) {
-            const info = doc.getImageProperties(logo);
-            const iconHeight = 4;
-            const iconWidth = Math.min(9, iconHeight * info.width / info.height);
-            doc.addImage(logo, type, right - senderWidth - iconWidth - 2, y - 3.1, iconWidth, iconHeight, undefined, 'FAST');
-          }
-        } catch (error) {
-          console.warn('Could not place BOB World logo before remitter number:', error);
-        }
-      }
-      doc.text(senderNumber, right, y, { align: 'right' });
+      try {
+        const info = doc.getImageProperties(bobWorldLogo);
+        const iconHeight = 4.2;
+        const iconWidth = Math.min(9, iconHeight * info.width / info.height);
+        doc.addImage(bobWorldLogo, 'PNG', right - senderWidth - iconWidth - 2, y - 3.1, iconWidth, iconHeight, undefined, 'FAST');
+      } catch (error) {
+        console.warn('Could not place BOB World logo before remitter number:', error);
+      }      doc.text(senderNumber, right, y, { align: 'right' });
       y += 8;
 
       y += 1;
@@ -336,29 +304,9 @@ export function TransactionReceiptDialog({
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
       const blob = doc.output('blob');
-      const shareFile = new File([blob], fileName, { type: 'application/pdf' });
-      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
-          typeof navigator.canShare === 'function' && navigator.canShare({ files: [shareFile] })) {
-        try {
-          await navigator.share({
-            files: [shareFile],
-            title: 'BOB World transaction receipt',
-            text: 'BOB World transfer receipt · ' + (transaction.referenceNumber || transaction.id),
-          });
-          setDownloadError(null);
-          toast({ title: 'Receipt shared', description: 'The BOB World transaction receipt PDF was shared.' });
-        } catch (shareError) {
-          if (shareError instanceof Error && shareError.name === 'AbortError') return;
-          throw shareError;
-        }
-      } else {
-        const savedLocation = await savePdfToDownloads(blob, fileName);
-        setDownloadError(null);
-        toast({
-          title: 'Receipt downloaded',
-          description: fileName + ' saved to ' + savedLocation + '.',
-        });
-      }
+      const savedLocation = await savePdfToDownloads(blob, fileName);
+      setDownloadError(null);
+      toast({ title: 'Receipt PDF downloaded', description: fileName + ' saved to ' + savedLocation + '.' });
     } catch (error) {
       console.error('Receipt PDF generation failed:', error);
       setDownloadError(error instanceof Error ? error.message : 'Could not generate the receipt PDF.');
@@ -367,85 +315,73 @@ export function TransactionReceiptDialog({
     }
   };
 
+  const handleShareRecord = async () => {
+    if (!transaction || !payee || !remitterAccountDetails) return;
+    const details = [
+      'Transaction successful',
+      'Amount: INR ' + formattedAmount,
+      'Paying to: ' + payee.name,
+      'From account: ' + maskReceiptAccount(remitterAccountDetails.accountNumber),
+      'Transfer type: ' + (transaction.transactionSubType || 'IMPS'),
+      'Date: ' + formattedDateTime,
+      'Reference number: ' + (transaction.referenceNumber || transaction.id || '-'),
+      'Remarks: ' + (transaction.comments || '-'),
+      'Personal record · Not issued by the bank',
+    ].join('\n');
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({ title: 'BOB World transaction record', text: details });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(details);
+        toast({ title: 'Transaction details copied', description: 'The record details are ready to share.' });
+      } else {
+        setDownloadError('Sharing is not available in this browser.');
+      }
+    } catch (shareError) {
+      if (!(shareError instanceof Error && shareError.name === 'AbortError')) setDownloadError(shareError instanceof Error ? shareError.message : 'Could not share transaction details.');
+    }
+  };
+
   if (!transaction || !payee || !remitterAccountDetails) return null;
+  const displayDate = Number.isFinite(parsedDate.getTime()) ? format(parsedDate, 'dd/MM/yyyy') : transaction.date;
+  const transferType = transaction.transactionSubType || 'IMPS';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md w-[90vw] max-w-[400px] p-0 flex flex-col max-h-[95vh] overflow-hidden rounded-lg shadow-2xl bg-background">
-        <DialogHeader className="sr-only"><DialogTitle>Transaction Receipt</DialogTitle></DialogHeader>
-        <div className="flex items-center justify-center border-b p-4">
-          {receiptLogo ? (
-            <img
-              src={receiptLogo}
-              alt="BOB World logo"
-              className="max-h-12 max-w-[150px] object-contain"
-              onError={(event) => { event.currentTarget.style.display = 'none'; }}
-            />
-          ) : (
-            <div className="text-center leading-none" aria-label="BOB World logo placeholder">
-              <span className="block text-2xl font-bold text-orange-600">bob</span>
-              <span className="block text-xs font-semibold text-orange-600">World</span>
-            </div>
-          )}
-        </div>
-        <div className="p-6 pt-4 text-center border-b">
-          <h2 className="text-lg font-semibold text-foreground tracking-wider">TRANSACTION RECORD</h2>
-          <p className="mt-1 text-[10px] font-semibold text-muted-foreground">PERSONAL RECORD · NOT ISSUED OR VERIFIED BY THE BANK</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">Recorded locally; no bank network was contacted.</p>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-1">
-            <DetailRow label="Reference number - UTR/RRN number/Tran ID" value={transaction.referenceNumber || transaction.id || "N/A"} labelCols="col-span-full" valueCols="col-span-full font-normal pt-0.5 pb-2" />
-            <div className="grid grid-cols-2 gap-x-4 pt-1">
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Date and time of transaction</p>
-                <p className="text-sm text-foreground font-medium">{formattedDateTime}</p>
+      <DialogContent className='w-screen max-w-[430px] h-[100dvh] max-h-[100dvh] p-0 gap-0 overflow-hidden rounded-none border-0 bg-[#f4f5f7] flex flex-col'>
+        <DialogHeader className='sr-only'><DialogTitle>Transaction receipt</DialogTitle></DialogHeader>
+        <div className='relative flex-1 min-h-0 overflow-y-auto'>
+          <div className='h-[178px] bg-gradient-to-br from-[#ff624a] to-[#f34b32]' />
+          <div className='relative -mt-[126px] mx-5 mb-5 bg-white shadow-md'>
+            <div className='pointer-events-none absolute -top-2 left-0 right-0 h-4' style={{ backgroundImage: 'radial-gradient(circle at 8px 8px, #ffffff 8px, transparent 8.5px)', backgroundSize: '24px 16px', backgroundRepeat: 'repeat-x' }} />
+            <div className='px-5 pt-7 pb-6'>
+              <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#22b58f] shadow-sm'><Check className='h-8 w-8 text-white' strokeWidth={3} /></div>
+              <h2 className='mt-3 text-center text-xl font-bold text-[#17191d]'>Transfer successful</h2>
+              <div className='mt-2 text-center'><p className='text-xs font-semibold text-[#333840]'>Amount</p><p className='mt-1 text-xl font-bold text-[#17191d]'><span className='mr-1'>₹</span>{formattedAmount}</p></div>
+              <div className='mt-4 border-t border-dashed border-[#b8bbc0]' />
+              <div className='mt-4 space-y-4 text-sm'>
+                <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Paying to</span><strong className='text-right text-[#17191d]'>{payee.name}</strong></div>
+                <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>From account</span><strong className='text-right text-[#17191d]'>{maskReceiptAccount(remitterAccountDetails.accountNumber)}</strong></div>
+                <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Transfer type</span><strong className='text-right text-[#17191d]'>{transferType}</strong></div>
+                <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Date</span><strong className='text-right text-[#17191d]'>{displayDate}</strong></div>
+                <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Reference number</span><strong className='max-w-[62%] break-all text-right text-[#17191d]'>{transaction.referenceNumber || transaction.id}</strong></div>
+                {transaction.comments && <div className='flex items-start justify-between gap-4'><span className='shrink-0 text-[#61666d]'>Remarks</span><strong className='max-w-[62%] break-words text-right text-[#17191d]'>{transaction.comments}</strong></div>}
+              </div>
+              <div className='mt-5 border-t border-dashed border-[#b8bbc0] pt-3 text-center'>
+                <p className='text-[10px] font-semibold tracking-wide text-[#5c626b]'>PERSONAL RECORD · NOT ISSUED BY THE BANK</p>
+                <p className='mt-1 text-[10px] text-[#777d85]'>Generated locally from information saved in this app.</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-4 pt-2">
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Account number of remitter</p>
-                <p className="text-sm text-foreground font-medium">{maskReceiptAccount(remitterAccountDetails.accountNumber)}</p>
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Name of remitter account</p>
-                <p className="text-sm text-foreground font-medium">{remitterAccountDetails.name || "N/A"}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 pt-2">
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Amount</p>
-                <p className="text-sm text-foreground font-medium">₹{formattedAmount}</p>
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Beneficiary Name</p>
-                <p className="text-sm text-foreground font-medium">{payee.name || "N/A"}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 pt-2">
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">Account number of beneficiary</p>
-                <p className="text-sm text-foreground font-medium">{maskReceiptAccount(payee.accountNumber)}</p>
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-muted-foreground">IFSC code of beneficiary bank</p>
-                <p className="text-sm text-foreground font-medium">{payee.ifscCode || "N/A"}</p>
-              </div>
-            </div>
-            <div className="pt-2">
-              <p className="text-xs text-muted-foreground text-left">Remarks</p>
-              <p className="text-sm text-foreground font-medium text-left">{transaction.comments || "ok"}</p>
-            </div>
-            {downloadError && <p role="alert" className="text-xs text-destructive pt-2">{downloadError}</p>}
+            <div className='pointer-events-none absolute -bottom-2 left-0 right-0 h-4' style={{ backgroundImage: 'radial-gradient(circle at 8px 0, #f4f5f7 8px, transparent 8.5px)', backgroundSize: '24px 16px', backgroundRepeat: 'repeat-x' }} />
           </div>
+          {downloadError && <p role='alert' className='mx-6 mb-3 text-xs text-destructive'>{downloadError}</p>}
         </div>
-        <DialogFooter className="p-4 border-t bg-muted/50 mt-auto gap-2 sm:justify-between">
-          <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={isDownloading} className="w-full sm:w-auto">
-            <FileDown className="mr-2 h-4 w-4" /> {isDownloading ? "Preparing PDF..." : "Share / Download PDF"}
-          </Button>
-          <DialogClose asChild>
-            <Button type="button" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">Done</Button>
-          </DialogClose>
+        <DialogFooter className='mt-auto border-t border-[#e2e4e8] bg-white p-3'>
+          <div className='grid w-full grid-cols-3 gap-2'>
+            <Button type='button' variant='outline' onClick={handleShareRecord} className='h-11 gap-1 px-2'><Share2 className='h-4 w-4' />Share</Button>
+            <Button type='button' onClick={handleDownloadPdf} disabled={isDownloading} className='h-11 gap-1 px-2 bg-[#1d3b63] text-white hover:bg-[#173151]'><Download className='h-4 w-4' />{isDownloading ? 'Saving…' : 'Download'}</Button>
+            <DialogClose asChild><Button type='button' variant='outline' className='h-11 px-2'>Done</Button></DialogClose>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

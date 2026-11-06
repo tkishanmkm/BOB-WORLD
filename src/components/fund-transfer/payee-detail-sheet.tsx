@@ -121,7 +121,7 @@ export function PayeeDetailSheet({ payee, transactions, open, onOpenChange, onTr
                   <Card className="shadow-md">
                       <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
                           <CardTitle className="text-base text-primary flex items-center"><Repeat className="mr-2 h-5 w-5"/>Last Transaction</CardTitle>
-                          {lastTransaction && <Button type="button" size="sm" variant="outline" onClick={() => setIsReceiptDialogOpen(true)}><FileDown className="mr-2 h-4 w-4" />Receipt PDF</Button>}
+                          {lastTransaction && <Button type="button" size="sm" variant="outline" onClick={() => setIsReceiptDialogOpen(true)}><FileDown className="mr-2 h-4 w-4" />Receipt</Button>}
                       </CardHeader>
                       <CardContent className="p-4 pt-1">
                           {lastTransaction ? (

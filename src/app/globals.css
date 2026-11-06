@@ -109,3 +109,11 @@
 .app-background-gradient {
   background-image: linear-gradient(to bottom, hsl(25 100% 90% / 0.6), hsl(var(--background)));
 }
+
+/* Phone-first app frame, tuned to a compact iPhone viewport. */
+html, body { min-height: 100%; width: 100%; overflow-x: hidden; }
+body { margin: 0; background: #eef0f3; }
+.ios-app-frame { position: relative; width: 100%; max-width: 430px; min-height: 100dvh; margin: 0 auto; overflow-x: clip; background: hsl(var(--background)); box-shadow: 0 0 28px rgba(16,24,40,.10); }
+@media (min-width: 431px) { .ios-app-frame > header.fixed, .ios-app-frame > nav.fixed { width: 430px; left: 50%; right: auto; transform: translateX(-50%); } }
+@keyframes otp-notification-drop { 0% { transform: translateY(-135%); opacity: 0; } 58% { transform: translateY(8px); opacity: 1; } 78% { transform: translateY(-3px); } 100% { transform: translateY(0); opacity: 1; } }
+.animate-otp-notification { animation: otp-notification-drop 620ms cubic-bezier(.2,.8,.25,1) both; }

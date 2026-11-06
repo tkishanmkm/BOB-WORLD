@@ -73,9 +73,9 @@ export function AppHeader() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/dashboard" className="flex flex-col items-start -space-y-1.5">
-            <span className="text-2xl font-bold text-primary">bob</span>
-            <span className="text-sm font-semibold text-primary">World</span>
+          <Link href="/dashboard" aria-label="BOB World home" className="flex items-center gap-2">
+            <img src="/assets/branding/bob-world-logo.png" alt="BOB World" className="h-10 w-[74px] object-contain" />
+            <img src="/assets/branding/bank-of-baroda-logo.png" alt="Bank of Baroda" className="h-6 w-[72px] object-contain" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <Button variant="ghost" size="icon" className="text-foreground hover:text-primary">

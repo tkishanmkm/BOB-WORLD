@@ -161,6 +161,7 @@ export const TPIN_HASH_STORAGE_KEY = 'bobworld_transfer_tpin_verifier';
 export const STATEMENT_PDF_KEY = 'bobworld_statement_pdf';
 export const STATEMENT_LOGO_KEY = 'bobworld_statement_logo';
 export const STATEMENT_BANK_LOGO_KEY = 'bobworld_statement_bank_logo';
+export const OTP_NOTIFICATION_AVATAR_KEY = 'bobworld_otp_notification_avatar';
 
 // Image related keys
 export const LOGIN_BANNER_KEY = 'bobworld_image_loginBannerDataUri';

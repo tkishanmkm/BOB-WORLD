@@ -281,24 +281,33 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
   const rightWidth = 82.0;
   const leftWidth = 80.0;
   const rows = [
-    { y: 76.55, hi: 'ग्राहक का नाम', en: ' / Account Name', value: account.name || '-' },
-    { y: 94.7, hi: 'खाता संख्या', en: ' / Account Number', value: account.accountNumber || '-' },
-    { y: 106.7, hi: 'खाता प्रकार', en: ' / Account Type', value: account.accountTypeName || account.accountType || '-' },
-    { y: 118.8, hi: 'ग्राहक का पता', en: ' / Customer Address', value: [account.customerAddress, account.customerCity, account.customerPin].filter(Boolean).join(', ') || '-' },
+    { y: 76.55, hi: 'ग्राहक का नाम', en: 'Account Name', value: account.name || '-' },
+    { y: 94.7, hi: 'खाता संख्या', en: 'Account Number', value: account.accountNumber || '-' },
+    { y: 106.7, hi: 'खाता प्रकार', en: 'Account Type', value: account.accountTypeName || account.accountType || '-' },
+    { y: 118.8, hi: 'ग्राहक का पता', en: 'Customer Address', value: [account.customerAddress, account.customerCity, account.customerPin].filter(Boolean).join(', ') || '-' },
   ];
   const rightRows = [
-    { y: 76.55, hi: 'शाखा का नाम', en: ' / Branch Name', value: account.branchName || '-' },
-    { y: 94.7, hi: 'आईएफएससी कोड', en: ' / IFSC Code', value: account.ifscCode || '-' },
-    { y: 106.7, hi: 'एमआईसीआर कोड', en: ' / MICR Code', value: account.micrCode || '-' },
-    { y: 118.8, hi: 'शाखा का पता', en: ' / Branch Address', value: [account.branchAddress, account.branchCity, account.branchPin].filter(Boolean).join(', ') || '-' },
+    { y: 76.55, hi: 'शाखा का नाम', en: 'Branch Name', value: account.branchName || '-' },
+    { y: 94.7, hi: 'आईएफएससी कोड', en: 'IFSC Code', value: account.ifscCode || '-' },
+    { y: 106.7, hi: 'एमआईसीआर कोड', en: 'MICR Code', value: account.micrCode || '-' },
+    { y: 118.8, hi: 'शाखा का पता', en: 'Branch Address', value: [account.branchAddress, account.branchCity, account.branchPin].filter(Boolean).join(', ') || '-' },
   ];
 
   const label = (hi: string, en: string, xPos: number, yPos: number): void => {
-    addHindi(doc, hi, xPos, yPos, 25, 5.15, 'left', false, '#171717');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not measure bilingual statement labels.');
+    const fontPixels = 5.15 * 96 / 72;
+    context.font = '400 ' + fontPixels + 'px "Nirmala UI", "Noto Sans Devanagari", "Mangal", Arial, sans-serif';
+    const hindiWidthMm = Math.max(5, (context.measureText(hi).width + 2) * 25.4 / 96);
+    const hindi = hindiImage(hi, hindiWidthMm, 5.15, 'left', false, '#171717');
+    doc.addImage(hindi.data, 'PNG', xPos, yPos, hindiWidthMm, hindi.height, undefined, 'FAST');
     doc.setFont('LiberationSans', 'normal');
     doc.setFontSize(4.65);
     doc.setTextColor(35, 35, 35);
-    doc.text(en, xPos + 25, yPos + 2.9);
+    doc.text('/ ' + en.replace(/^\s*\/\s*/, ''), xPos + hindiWidthMm + 0.55, yPos + 2.9);
+    canvas.width = 0;
+    canvas.height = 0;
   };
   const value = (text: string, xPos: number, yPos: number, maxWidth: number, align: 'left' | 'right', maxLines = 4): void => {
     doc.setFont('LiberationSans', 'bold');
@@ -316,7 +325,7 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
   rightRows.forEach((field, index) => {
     const xPos = rightEdge - rightWidth;
     label(field.hi, field.en, xPos, field.y);
-    value(field.value, rightEdge, field.y + (index === 3 ? 6.0 : 5.0), rightWidth, 'right', index === 3 ? 4 : 1);
+    value(field.value, rightEdge, field.y + (index === 3 ? 6.0 : 5.0), rightWidth, 'right', index === 0 ? 2 : index === 3 ? 4 : 1);
   });
 }
 
@@ -506,14 +515,7 @@ function makeRows(
       balance: money(running),
     });
   }
-  const totalDebit = roundMoney(selected.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0));
-  const totalCredit = roundMoney(selected.filter(tx => tx.type === 'credit').reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0));
-  const closingBalance = roundMoney(running);
-  rows.push(
-    { serial: '-', transactionDate: '-', valueDate: '-', description: 'TOTAL DEBIT', chequeNumber: '-', debit: money(totalDebit), credit: '-', balance: '-' },
-    { serial: '-', transactionDate: '-', valueDate: '-', description: 'TOTAL CREDIT', chequeNumber: '-', debit: '-', credit: money(totalCredit), balance: '-' },
-    { serial: '-', transactionDate: '-', valueDate: '-', description: 'CLOSING BALANCE', chequeNumber: '-', debit: '-', credit: '-', balance: money(closingBalance) },
-  );
+
   return rows;
 }
 

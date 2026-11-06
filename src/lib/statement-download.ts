@@ -53,8 +53,8 @@ export async function ensureStatementBrandAssets(): Promise<StatementDownloadAss
   };
 
   const [bobWorldLogo, bankLogo] = await Promise.all([
-    load(STATEMENT_LOGO_KEY, '/assets/statement/bob-world-logo.png'),
-    load(STATEMENT_BANK_LOGO_KEY, '/assets/statement/bank-of-baroda-logo.png'),
+    load(STATEMENT_LOGO_KEY, '/assets/branding/bob-world-logo.png'),
+    load(STATEMENT_BANK_LOGO_KEY, '/assets/branding/bank-of-baroda-logo.png'),
   ]);
   return { bobWorldLogo, bankLogo };
 }

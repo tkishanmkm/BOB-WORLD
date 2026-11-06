@@ -71,27 +71,70 @@ export async function removeAppState(key: string): Promise<void> {
 }
 
 /** One-time, non-destructive migration: existing localStorage values win unless absent. */
-export async function migrateLegacyStorage(keys: string[]): Promise<void> {
-  for (const key of keys) {
-    const legacyValue = window.localStorage.getItem(key);
-    const indexedValue = await readAppState<string>(key);
-    if (legacyValue !== null && indexedValue === null) {
-      await writeAppState(key, legacyValue);
-    } else if (legacyValue === null && typeof indexedValue === 'string') {
-      window.localStorage.setItem(key, indexedValue);
+let storageMirrorInstalled = false;
+
+function installStorageMirror(): void {
+  if (storageMirrorInstalled || typeof window === 'undefined') return;
+  const prototype = Storage.prototype;
+  const originalSetItem = prototype.setItem;
+  const originalRemoveItem = prototype.removeItem;
+  const originalClear = prototype.clear;
+  prototype.setItem = function (key: string, value: string): void {
+    originalSetItem.call(this, key, value);
+    if (this === window.localStorage && key.startsWith('bobworld_')) {
+      void writeAppState(key, value).catch(error => console.error('IndexedDB state write failed:', key, error));
     }
-  }
+  };
+  prototype.removeItem = function (key: string): void {
+    originalRemoveItem.call(this, key);
+    if (this === window.localStorage && key.startsWith('bobworld_')) {
+      void removeAppState(key).catch(error => console.error('IndexedDB state removal failed:', key, error));
+    }
+  };
+  prototype.clear = function (): void {
+    const keys: string[] = [];
+    if (this === window.localStorage) {
+      for (let index = 0; index < this.length; index += 1) {
+        const key = this.key(index);
+        if (key && key.startsWith('bobworld_')) keys.push(key);
+      }
+    }
+    originalClear.call(this);
+    if (this === window.localStorage) {
+      for (const key of keys) {
+        void removeAppState(key).catch(error => console.error('IndexedDB clear failed:', key, error));
+      }
+    }
+  };
+  storageMirrorInstalled = true;
 }
 
-/** Persist the current app snapshot atomically so a failed quota/write does not leave a mixed revision. */
+/** IndexedDB is authoritative after migration; existing localStorage is imported once. */
+export async function migrateLegacyStorage(keys: string[]): Promise<void> {
+  const localKeys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+    .filter((key): key is string => Boolean(key && key.startsWith('bobworld_')));
+  const indexed = await readAllAppState();
+  const allKeys = new Set([...keys, ...localKeys, ...Object.keys(indexed).filter(key => key.startsWith('bobworld_'))]);
+  for (const key of allKeys) {
+    const indexedValue = indexed[key];
+    const legacyValue = window.localStorage.getItem(key);
+    if (typeof indexedValue === 'string') window.localStorage.setItem(key, indexedValue);
+    else if (legacyValue !== null) await writeAppState(key, legacyValue);
+  }
+  installStorageMirror();
+}
+
+/** Persist all application-namespaced keys atomically, not only the caller's partial list. */
 export async function persistStorageKeys(keys: string[]): Promise<void> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const updatedAt = new Date().toISOString();
+    const localKeys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+      .filter((key): key is string => Boolean(key && key.startsWith('bobworld_')));
     try {
-      for (const key of keys) {
+      for (const key of new Set([...keys, ...localKeys])) {
         const value = window.localStorage.getItem(key);
         if (value === null) store.delete(key);
         else store.put({ key, value, updatedAt });
@@ -118,6 +161,7 @@ export const BOB_WORLD_STATE_KEYS = [
   'bobworld_passbook_closing_balance',
   'bobworld_statement_logo',
   'bobworld_statement_bank_logo',
+  'bobworld_otp_notification_avatar',
   'bobworld_transfer_tpin_verifier',
   'bobworld_image_loginBannerDataUri',
   'bobworld_image_loginBannerDataUri_1',

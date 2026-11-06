@@ -30,6 +30,7 @@ import {
   PASSBOOK_CLOSING_BALANCE_KEY,
   TPIN_HASH_STORAGE_KEY,
   TRANSACTIONS_STORAGE_KEY,
+  OTP_NOTIFICATION_AVATAR_KEY,
 } from '@/lib/constants';
 import { buildImpsNarrations, calculateImpsCharge, createImpsReference, generateLocalOtp } from '@/lib/fund-transfer';
 import { verifyTpin } from '@/lib/tpin-security';
@@ -56,7 +57,7 @@ function initials(name: string): string {
 
 function maskAccount(value: string): string {
   const digits = value.replace(/\D/g, '');
-  return digits ? 'X'.repeat(Math.max(4, digits.length - 4)) + digits.slice(-4) : 'N/A';
+  return digits ? 'XXXX' + digits.slice(-4) : 'N/A';
 }
 
 function money(value: number): string {
@@ -77,6 +78,7 @@ export function TransferFlowDialog({
   const [localOtp, setLocalOtp] = useState('');
   const [otpIssuedAt, setOtpIssuedAt] = useState(0);
   const [otpAttempts, setOtpAttempts] = useState(0);
+  const [otpAvatarUrl, setOtpAvatarUrl] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [remitter, setRemitter] = useState<AccountDetailsType>(INITIAL_ACCOUNT_DETAILS);
   const [result, setResult] = useState<TransferResult | null>(null);
@@ -109,6 +111,8 @@ export function TransferFlowDialog({
       const storedBalance = savedBalance === null ? INITIAL_BALANCE : Number(savedBalance);
       setRemitter(account);
       setBalance(Number.isFinite(storedBalance) ? storedBalance : INITIAL_BALANCE);
+      const savedOtpAvatar = localStorage.getItem(OTP_NOTIFICATION_AVATAR_KEY);
+      setOtpAvatarUrl(savedOtpAvatar && savedOtpAvatar.startsWith('data:image/') ? savedOtpAvatar : null);
     } catch (loadError) {
       console.error('Could not load transfer account details:', loadError);
       setRemitter(INITIAL_ACCOUNT_DETAILS);
@@ -340,12 +344,10 @@ export function TransferFlowDialog({
                   <Textarea id="imps-remarks" value={remarks} onChange={event => setRemarks(event.target.value)} placeholder="Add transfer remarks" rows={2} maxLength={40} />
                 </div>
 
-                <div className="rounded-xl border bg-muted/20 p-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Available balance</span><span className="font-semibold">₹{money(balance)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">IMPS charge (including GST)</span><span>{charge ? '₹' + money(charge.total) : 'â€”'}</span></div>
-                  {charge && <div className="flex justify-between border-t pt-2 font-semibold"><span>Total debit</span><span>₹{money(totalDebit)}</span></div>}
-                  <p className="text-[11px] text-muted-foreground">Charges: up to ₹1,000 = ₹2.95 · ₹1,001â€“₹25,000 = ₹5.90 · ₹25,001â€“₹5,00,000 = ₹17.70 (18% GST included).</p>
-                </div>
+                <div className='rounded-xl border bg-muted/20 p-3 space-y-2 text-sm'>
+  <div className='flex justify-between'><span className='text-muted-foreground'>Available balance</span><span className='font-semibold'>{'₹'}{money(balance)}</span></div>
+  {charge && <div className='flex justify-between border-t pt-2 font-semibold'><span>Total debit (including applicable fee)</span><span>{'₹'}{money(totalDebit)}</span></div>}
+</div>
               </div>
               {error && <p role="alert" className="text-sm text-destructive flex items-start gap-2"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}{error.includes('Settings') && <Link className="underline font-semibold" href="/settings">Open Settings</Link>}</p>}
               <DialogFooter>
@@ -364,7 +366,7 @@ export function TransferFlowDialog({
               <div className="space-y-4 py-4">
                 <div className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
                   <ShieldCheck className="h-8 w-8 text-primary" />
-                  <div><p className="font-semibold">{payee.name}</p><p className="text-sm text-muted-foreground">₹{money(amount)} + ₹{money(charge?.total || 0)} charge</p></div>
+                  <div><p className='font-semibold'>{payee.name}</p><p className='text-sm text-muted-foreground'>Total debit: {'₹'}{money(totalDebit)}</p></div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transfer-tpin">4-digit TPIN</Label>
@@ -386,9 +388,10 @@ export function TransferFlowDialog({
                 <DialogDescription>Confirm the transfer to {payee.name}.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-3">
-                <div className="rounded-xl border bg-background p-4 shadow-sm">
+                <div className="animate-otp-notification rounded-xl border bg-background p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border">
+                      {otpAvatarUrl ? <AvatarImage src={otpAvatarUrl} alt="JK-BOBSMS-S" /> : null}
                       <AvatarFallback className="bg-[#173b68] text-white font-bold">JK</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
@@ -422,7 +425,7 @@ export function TransferFlowDialog({
             <>
               <div className="relative -mx-6 -mt-6 rounded-t-2xl bg-gradient-to-br from-[#ff624a] to-[#f34b32] px-6 pb-10 pt-8 text-center text-white">
                 <CheckCircle2 className="mx-auto h-14 w-14 rounded-full bg-white p-1 text-emerald-500" />
-                <h2 className="mt-3 text-xl font-bold">Transfer record saved</h2>
+                <h2 className="mt-3 text-xl font-bold">Transaction successful</h2>
                 <p className="mt-1 text-sm text-white/90">The transaction and charge were recorded in this app.</p>
               </div>
               <div className="-mt-7 relative rounded-xl border bg-background px-5 pb-5 pt-5 shadow-lg">
@@ -437,14 +440,11 @@ export function TransferFlowDialog({
                   <div className="flex justify-between gap-4"><span className="text-muted-foreground">Date</span><strong>{new Date(result.transaction.date).toLocaleDateString('en-GB')}</strong></div>
                   <div className="flex justify-between gap-4"><span className="text-muted-foreground">Reference number</span><strong className="text-right">{result.transaction.referenceNumber}</strong></div>
                 </div>
-                <div className="mt-4 border-t border-dashed pt-3 text-xs text-muted-foreground">
-                  <div className="flex justify-between"><span>IMPS charges (incl. GST)</span><span>₹{money(result.chargeTransaction.amount)}</span></div>
-                  <div className="mt-1 flex justify-between font-semibold"><span>Total debited</span><span>₹{money(amount + result.chargeTransaction.amount)}</span></div>
-                </div>
+
               </div>
               <div className="flex flex-col items-center gap-3 pt-4">
                 <Button variant="ghost" onClick={shareReceipt} className="w-full text-[#1c385e] hover:bg-[#1c385e]/5">
-                  <FileDown className="mr-2 h-5 w-5" />Receipt PDF
+                  <FileDown className="mr-2 h-5 w-5" />Receipt
                 </Button>
                 <Button onClick={() => close(false)} className="w-full rounded-full bg-[#1c385e] py-6 text-base font-semibold text-white hover:bg-[#142c4c]">Done</Button>
                 <Link href="/help" className="inline-flex items-center gap-2 py-2 text-sm font-semibold text-[#1c385e]">
@@ -468,4 +468,3 @@ export function TransferFlowDialog({
     </>
   );
 }
-
