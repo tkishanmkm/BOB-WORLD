@@ -164,18 +164,9 @@ export default function LoginPage() {
       {!showSplash && (
     <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-1 overflow-y-auto p-4 pt-6 space-y-5">
-        <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2 pt-2">
-              <span className="text-2xl font-bold text-primary">bob</span>
-              <span className="text-lg font-semibold text-primary">World</span>
-            </div>
-            <div className="text-right flex flex-col items-end">
-                <div className="h-7 w-7 bg-white rounded-full flex items-center justify-center shadow-sm border border-primary/20 mb-1">
-                  <span className="text-[10px] font-bold text-primary leading-none">bob</span>
-                </div>
-                <p className="text-xs font-semibold text-primary leading-tight">बैंक ऑफ़ बड़ौदा</p>
-                <p className="text-xs text-muted-foreground leading-tight -mt-0.5">Bank of Baroda</p>
-            </div>
+        <div className="flex items-center justify-between gap-4 min-h-14">
+          <img src="/assets/branding/bob-world-logo.png" alt="BOB World" className="h-12 w-[112px] object-contain object-left" />
+          <img src="/assets/branding/bank-of-baroda-logo.png" alt="Bank of Baroda" className="h-9 w-[148px] object-contain object-right" />
         </div>
 
         <div className="rounded-lg overflow-hidden shadow-md relative h-48">

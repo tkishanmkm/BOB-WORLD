@@ -293,21 +293,11 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
     { y: 118.8, hi: 'शाखा का पता', en: 'Branch Address', value: [account.branchAddress, account.branchCity, account.branchPin].filter(Boolean).join(', ') || '-' },
   ];
 
-  const label = (hi: string, en: string, xPos: number, yPos: number): void => {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Could not measure bilingual statement labels.');
-    const fontPixels = 5.15 * 96 / 72;
-    context.font = '400 ' + fontPixels + 'px "Nirmala UI", "Noto Sans Devanagari", "Mangal", Arial, sans-serif';
-    const hindiWidthMm = Math.max(5, (context.measureText(hi).width + 2) * 25.4 / 96);
-    const hindi = hindiImage(hi, hindiWidthMm, 5.15, 'left', false, '#171717');
-    doc.addImage(hindi.data, 'PNG', xPos, yPos, hindiWidthMm, hindi.height, undefined, 'FAST');
+  const label = (_hi: string, en: string, xPos: number, yPos: number): void => {
     doc.setFont('LiberationSans', 'normal');
-    doc.setFontSize(4.65);
+    doc.setFontSize(5.15);
     doc.setTextColor(35, 35, 35);
-    doc.text('/ ' + en.replace(/^\s*\/\s*/, ''), xPos + hindiWidthMm + 0.55, yPos + 2.9);
-    canvas.width = 0;
-    canvas.height = 0;
+    doc.text('/ ' + en.replace(/^\s*\/\s*/, ''), xPos, yPos + 2.9);
   };
   const value = (text: string, xPos: number, yPos: number, maxWidth: number, align: 'left' | 'right', maxLines = 4): void => {
     doc.setFont('LiberationSans', 'bold');

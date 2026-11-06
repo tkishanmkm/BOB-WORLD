@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
@@ -77,7 +78,7 @@ function amountInWords(value: number): string {
 function maskReceiptAccount(value: string | undefined): string {
   const digits = String(value || '').replace(/\D/g, '');
   if (!digits) return 'N/A';
-  return 'XXXX' + digits.slice(-4);
+  return 'XXXX ' + digits.slice(-4);
 }
 
 const bankIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96"><path fill="#5f6874" d="M12 2 2 7v2h20V7L12 2Zm-7 9h2v7H5v-7Zm6 0h2v7h-2v-7Zm6 0h2v7h-2v-7ZM3 20h18v2H3v-2Z"/></svg>';
@@ -135,7 +136,7 @@ export function TransactionReceiptDialog({
     maximumFractionDigits: 2,
   }) : '0.00';
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (shareAfterSave = false) => {
     if (!transaction || !payee || !remitterAccountDetails) return;
     setDownloadError(null);
     setIsDownloading(true);
@@ -304,9 +305,20 @@ export function TransactionReceiptDialog({
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
       const blob = doc.output('blob');
-      const savedLocation = await savePdfToDownloads(blob, fileName);
+      let savedLocation = 'Downloads';
+      if (shareAfterSave && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        const receiptFile = new File([blob], fileName, { type: 'application/pdf' });
+        if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [receiptFile] })) {
+          await navigator.share({ files: [receiptFile], title: 'BOB World transaction receipt' });
+          savedLocation = 'the iOS share sheet (choose Save to Files or a sharing app)';
+        } else {
+          savedLocation = await savePdfToDownloads(blob, fileName);
+        }
+      } else {
+        savedLocation = await savePdfToDownloads(blob, fileName);
+      }
       setDownloadError(null);
-      toast({ title: 'Receipt PDF downloaded', description: fileName + ' saved to ' + savedLocation + '.' });
+      toast({ title: shareAfterSave ? 'Receipt ready to share' : 'Receipt PDF downloaded', description: fileName + ' saved to ' + savedLocation + '.' });
     } catch (error) {
       console.error('Receipt PDF generation failed:', error);
       setDownloadError(error instanceof Error ? error.message : 'Could not generate the receipt PDF.');
@@ -316,30 +328,7 @@ export function TransactionReceiptDialog({
   };
 
   const handleShareRecord = async () => {
-    if (!transaction || !payee || !remitterAccountDetails) return;
-    const details = [
-      'Transaction successful',
-      'Amount: INR ' + formattedAmount,
-      'Paying to: ' + payee.name,
-      'From account: ' + maskReceiptAccount(remitterAccountDetails.accountNumber),
-      'Transfer type: ' + (transaction.transactionSubType || 'IMPS'),
-      'Date: ' + formattedDateTime,
-      'Reference number: ' + (transaction.referenceNumber || transaction.id || '-'),
-      'Remarks: ' + (transaction.comments || '-'),
-      'Personal record · Not issued by the bank',
-    ].join('\n');
-    try {
-      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        await navigator.share({ title: 'BOB World transaction record', text: details });
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(details);
-        toast({ title: 'Transaction details copied', description: 'The record details are ready to share.' });
-      } else {
-        setDownloadError('Sharing is not available in this browser.');
-      }
-    } catch (shareError) {
-      if (!(shareError instanceof Error && shareError.name === 'AbortError')) setDownloadError(shareError instanceof Error ? shareError.message : 'Could not share transaction details.');
-    }
+    await handleDownloadPdf(true);
   };
 
   if (!transaction || !payee || !remitterAccountDetails) return null;
@@ -348,7 +337,7 @@ export function TransactionReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='w-screen max-w-[430px] h-[100dvh] max-h-[100dvh] p-0 gap-0 overflow-hidden rounded-none border-0 bg-[#f4f5f7] flex flex-col'>
+      <DialogContent showCloseButton={false} className='w-screen max-w-[430px] h-[100dvh] max-h-[100dvh] p-0 gap-0 overflow-hidden rounded-none border-0 bg-[#f4f5f7] flex flex-col'>
         <DialogHeader className='sr-only'><DialogTitle>Transaction receipt</DialogTitle></DialogHeader>
         <div className='relative flex-1 min-h-0 overflow-y-auto'>
           <div className='h-[178px] bg-gradient-to-br from-[#ff624a] to-[#f34b32]' />
@@ -378,9 +367,9 @@ export function TransactionReceiptDialog({
         </div>
         <DialogFooter className='mt-auto border-t border-[#e2e4e8] bg-white p-3'>
           <div className='grid w-full grid-cols-3 gap-2'>
-            <Button type='button' variant='outline' onClick={handleShareRecord} className='h-11 gap-1 px-2'><Share2 className='h-4 w-4' />Share</Button>
-            <Button type='button' onClick={handleDownloadPdf} disabled={isDownloading} className='h-11 gap-1 px-2 bg-[#1d3b63] text-white hover:bg-[#173151]'><Download className='h-4 w-4' />{isDownloading ? 'Saving…' : 'Download'}</Button>
+            <Button type='button' variant='outline' onClick={handleShareRecord} disabled={isDownloading} className='h-11 gap-1 px-2'><Share2 className='h-4 w-4' />Share</Button>
             <DialogClose asChild><Button type='button' variant='outline' className='h-11 px-2'>Done</Button></DialogClose>
+            <Link href='/need-help' className='inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground'>Need help</Link>
           </div>
         </DialogFooter>
       </DialogContent>

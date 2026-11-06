@@ -74,8 +74,7 @@ export function AppHeader() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link href="/dashboard" aria-label="BOB World home" className="flex items-center gap-2">
-            <img src="/assets/branding/bob-world-logo.png" alt="BOB World" className="h-10 w-[74px] object-contain" />
-            <img src="/assets/branding/bank-of-baroda-logo.png" alt="Bank of Baroda" className="h-6 w-[72px] object-contain" />
+            <img src="/assets/branding/bob-world-logo.png" alt="BOB World" className="h-10 w-[116px] object-contain object-left" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <Button variant="ghost" size="icon" className="text-foreground hover:text-primary">

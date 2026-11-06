@@ -194,6 +194,7 @@ export async function savePdfToDownloads(pdf: Blob, fileName: string): Promise<s
     return platform === 'android' ? 'Documents/Downloads' : 'Files > On My iPhone > BOB World > Downloads';
   }
 
-  triggerBrowserDownload(pdf, fileName);
+  const pdfOnly = pdf.type === 'application/pdf' ? pdf : new Blob([pdf], { type: 'application/pdf' });
+  triggerBrowserDownload(pdfOnly, fileName.toLowerCase().endsWith('.pdf') ? fileName : fileName + '.pdf');
   return 'Downloads';
 }
