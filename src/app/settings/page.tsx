@@ -556,14 +556,14 @@ export default function SettingsPage() {
         if (importedData.payees) localStorage.setItem(PAYEES_STORAGE_KEY, JSON.stringify(importedData.payees));
         if (importedData.liveAgentMessages) localStorage.setItem(LIVE_AGENT_MESSAGES_STORAGE_KEY, JSON.stringify(importedData.liveAgentMessages));
         
-        if (importedData.passbookTotalIn) localStorage.setItem(PASSBOOK_TOTAL_IN_KEY, importedData.passbookTotalIn);
-        else localStorage.removeItem(PASSBOOK_TOTAL_IN_KEY);
+        if (importedData.passbookTotalIn !== undefined && importedData.passbookTotalIn !== null) localStorage.setItem(PASSBOOK_TOTAL_IN_KEY, String(importedData.passbookTotalIn));
+        else if (!Object.prototype.hasOwnProperty.call(importedAppState, PASSBOOK_TOTAL_IN_KEY)) localStorage.removeItem(PASSBOOK_TOTAL_IN_KEY);
 
-        if (importedData.passbookTotalOut) localStorage.setItem(PASSBOOK_TOTAL_OUT_KEY, importedData.passbookTotalOut);
-        else localStorage.removeItem(PASSBOOK_TOTAL_OUT_KEY);
+        if (importedData.passbookTotalOut !== undefined && importedData.passbookTotalOut !== null) localStorage.setItem(PASSBOOK_TOTAL_OUT_KEY, String(importedData.passbookTotalOut));
+        else if (!Object.prototype.hasOwnProperty.call(importedAppState, PASSBOOK_TOTAL_OUT_KEY)) localStorage.removeItem(PASSBOOK_TOTAL_OUT_KEY);
 
-        if (importedData.passbookClosingBalance) localStorage.setItem(PASSBOOK_CLOSING_BALANCE_KEY, importedData.passbookClosingBalance);
-        else localStorage.removeItem(PASSBOOK_CLOSING_BALANCE_KEY);
+        if (importedData.passbookClosingBalance !== undefined && importedData.passbookClosingBalance !== null) localStorage.setItem(PASSBOOK_CLOSING_BALANCE_KEY, String(importedData.passbookClosingBalance));
+        else if (!Object.prototype.hasOwnProperty.call(importedAppState, PASSBOOK_CLOSING_BALANCE_KEY)) localStorage.removeItem(PASSBOOK_CLOSING_BALANCE_KEY);
 
         const imageKeysMap: Record<string, string> = { 
             loginBanner1: LOGIN_BANNER_KEY_1,
