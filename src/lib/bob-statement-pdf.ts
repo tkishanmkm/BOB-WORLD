@@ -370,7 +370,7 @@ function drawTableRow(doc: jsPDF, row: StatementRow, y: number, height: number, 
     row.transactionDate || '-',
     row.valueDate || '-',
     row.description || '-',
-    row.chequeNumber || '-',
+    '', // Cheque Number column is intentionally always blank in statement PDFs.
     row.debit || '-',
     row.credit || '-',
     row.balance || '-',
@@ -388,6 +388,9 @@ function drawTableRow(doc: jsPDF, row: StatementRow, y: number, height: number, 
   [4, 5, 6, 7].forEach(index => doc.line(xPositions[index], y, xPositions[index], y + height));
 
   for (let index = 0; index < COLUMN_WIDTHS.length; index += 1) {
+    // Keep the cheque-number column completely empty, even if source transactions
+    // contain cheque, instrument, or reference numbers.
+    if (index === 4) continue;
     const x = xPositions[index];
     const width = COLUMN_WIDTHS[index];
     doc.setFont('LiberationSans', 'normal');
