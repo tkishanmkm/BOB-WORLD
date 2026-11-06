@@ -294,11 +294,6 @@ export function TransactionReceiptDialog({
       row('Transfer date', formattedDateTime, true);
       row('Reference ID', transaction.referenceNumber || transaction.id || '-');
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.setTextColor(110, 116, 124);
-      doc.text('APP-GENERATED COPY', pageWidth / 2, 282, { align: 'center' });
-
       const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
       const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
       const blob = doc.output('blob');
