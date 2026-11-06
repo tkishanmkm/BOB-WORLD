@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import type { AccountDetailsType, TransactionType } from '@/lib/types';
+import { getAccountTypeLabel } from '@/lib/account-type';
 
 export interface BobStatementPdfOptions {
   account: AccountDetailsType;
@@ -275,7 +276,7 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
   const rows = [
     { hi: 'ग्राहक का नाम', en: 'Account Name', value: account.name || '-', maxLines: 1 },
     { hi: 'खाता संख्या', en: 'Account Number', value: account.accountNumber || '-', maxLines: 1 },
-    { hi: 'खाता प्रकार', en: 'Account Type', value: account.accountTypeName || account.accountType || 'ACCOUNT TYPE NOT SET', maxLines: 1 },
+    { hi: 'खाता प्रकार', en: 'Account Type', value: getAccountTypeLabel(account), maxLines: 1 },
     { hi: 'ग्राहक का पता', en: 'Customer Address', value: [account.customerAddress, account.customerCity, account.customerPin].filter(Boolean).join(', ') || '-', maxLines: 4 },
   ];
   const rightRows = [
