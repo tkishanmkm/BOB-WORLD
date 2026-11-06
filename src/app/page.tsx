@@ -172,7 +172,6 @@ export default function LoginPage() {
     }
   };
 
-  const firstName = accountDetails.name?.trim().split(/\s+/)[0] || "Customer";
   const fullName = accountDetails.name?.trim() || "Customer";
 
   return (
@@ -245,7 +244,6 @@ export default function LoginPage() {
 
           <div
             className="mx-auto flex h-[58px] max-w-[280px] items-center justify-center gap-4 rounded-full bg-white pl-5 pr-1 shadow-[0_5px_18px_rgba(25,45,70,0.10)]"
-            onClick={() => inputRefs.current[pin.findIndex((digit) => digit === "") === -1 ? 3 : pin.findIndex((digit) => digit === "")]?.focus()}
           >
             {pin.map((digit, index) => (
               <div key={index} className="relative flex h-8 w-7 items-center justify-center">
