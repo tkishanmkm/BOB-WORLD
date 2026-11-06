@@ -50,21 +50,11 @@ function triggerBrowserDownload(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-function dataUriToBlob(dataUri: string, mime: string): Blob {
-  const base64 = dataUri.slice(dataUri.indexOf(',') + 1);
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mime });
-}
-
 /**
  * Saves exactly one generated statement PDF. Branding stays embedded in the
  * PDF; source logo assets are never exported as separate files or attachments.
  */
-export async function saveStatementPdfAndAssets(
+export async function saveStatementPdf(
   pdf: Blob,
   fileName: string,
 ): Promise<string> {
