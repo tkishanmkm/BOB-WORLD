@@ -293,9 +293,17 @@ function drawAccountPanel(doc: jsPDF, account: AccountDetailsType, titleArtwork:
   };
   const value = (text: string, xPos: number, yPos: number, maxWidth: number, maxLines: number): void => {
     doc.setFont('LiberationSans', 'bold');
-    doc.setFontSize(7.8);
     doc.setTextColor(18, 18, 18);
-    const lines = doc.splitTextToSize(text.trim() || '-', maxWidth).slice(0, maxLines);
+    let fontSize = 7.8;
+    let lines: string[] = [];
+    const fullText = text.trim() || '-';
+    do {
+      doc.setFontSize(fontSize);
+      lines = doc.splitTextToSize(fullText, maxWidth);
+      if (lines.length <= maxLines || fontSize <= 5.2) break;
+      fontSize = Math.max(5.2, fontSize - 0.4);
+    } while (true);
+    // Never silently discard part of an account address or branch name.
     doc.text(lines, xPos, yPos, { align: 'left', lineHeightFactor: 1.0 });
   };
 
