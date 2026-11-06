@@ -537,7 +537,7 @@ export default function SettingsPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const jsonString = e.target?.result as string;
         const importedData = JSON.parse(jsonString);
@@ -581,9 +581,11 @@ export default function SettingsPage() {
                 }
             }
         }
+        await persistStorageKeys(BOB_WORLD_STATE_KEYS);
         window.location.reload();
       } catch (error) {
-        toast({ title: "Import Failed", description: "Could not parse the file. Ensure it's valid JSON.", variant: "destructive" });
+        console.error("Error importing application data:", error);
+        toast({ title: "Import Failed", description: "Could not apply the file. Ensure it is valid JSON and that device storage is available.", variant: "destructive" });
       }
     };
     reader.readAsText(file);
