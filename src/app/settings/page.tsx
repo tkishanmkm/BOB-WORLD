@@ -998,3 +998,463 @@ export default function SettingsPage() {
                    <div><Label htmlFor="confirmTransferTpin">Confirm TPIN</Label><Input id="confirmTransferTpin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={confirmTransferTpin} onChange={event => setConfirmTransferTpin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1 tracking-[0.4em]" placeholder="••••" /></div>
                  </div>
                  <div className="flex flex-wrap items-center gap-2">
+                   <Button type="button" onClick={handleSaveTransferTpin} disabled={isSavingTransferTpin || transferTpin.length !== 4 || confirmTransferTpin.length !== 4}>{isSavingTransferTpin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Save Transfer TPIN</Button>
+                   <p className="text-xs text-muted-foreground">Use a TPIN different from your login PIN. This local flow does not connect to the bank.</p>
+                 </div>
+               </div>
+             </section>
+
+             <section className="space-y-4">
+               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement Account & Branch Fields</h3>
+               <CardDescription>Complete any detail that is missing from the uploaded statement. These values are used when generating a new statement PDF.</CardDescription>
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                 <div><Label htmlFor="customerAddress">Customer Address</Label><Input id="customerAddress" value={accountDetails.customerAddress || ''} onChange={(e) => handleDetailsChange('customerAddress', e.target.value)} className="mt-1" placeholder="Customer postal address" /></div>
+                 <div><Label htmlFor="customerCity">Customer City</Label><Input id="customerCity" value={accountDetails.customerCity || ''} onChange={(e) => handleDetailsChange('customerCity', e.target.value)} className="mt-1" placeholder="City" /></div>
+                 <div><Label htmlFor="ckycNumber">CKYC Number</Label><Input id="ckycNumber" value={accountDetails.ckycNumber || ''} onChange={(e) => handleDetailsChange('ckycNumber', e.target.value)} className="mt-1" placeholder="CKYC number" /></div>
+                 <div><Label htmlFor="nominee">Nominee Name</Label><Input id="nominee" value={accountDetails.nominee || ''} onChange={(e) => handleDetailsChange('nominee', e.target.value)} className="mt-1" placeholder="Nominee name" /></div>
+                 <div><Label htmlFor="customerPin">Customer PIN / Postal Code</Label><Input id="customerPin" value={accountDetails.customerPin || ''} onChange={(e) => handleDetailsChange('customerPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="branchAddress">Branch Address</Label><Input id="branchAddress" value={accountDetails.branchAddress || ''} onChange={(e) => handleDetailsChange('branchAddress', e.target.value)} className="mt-1" placeholder="Branch postal address" /></div>
+                 <div><Label htmlFor="branchCity">Branch City</Label><Input id="branchCity" value={accountDetails.branchCity || ''} onChange={(e) => handleDetailsChange('branchCity', e.target.value)} className="mt-1" placeholder="City" /></div>
+                 <div><Label htmlFor="branchPin">Branch PIN / Postal Code</Label><Input id="branchPin" value={accountDetails.branchPin || ''} onChange={(e) => handleDetailsChange('branchPin', e.target.value)} className="mt-1" inputMode="numeric" maxLength={10} placeholder="Postal code" /></div>
+                 <div><Label htmlFor="micrCode">MICR Code</Label><Input id="micrCode" value={accountDetails.micrCode || ''} onChange={(e) => handleDetailsChange('micrCode', e.target.value)} className="mt-1" inputMode="numeric" maxLength={9} placeholder="9-digit MICR" /></div>
+                 <div><Label htmlFor="statementOpeningBalance">Statement Opening Balance (INR)</Label><Input id="statementOpeningBalance" type="number" min="0" step="0.01" value={accountDetails.statementOpeningBalance ?? ''} onChange={(e) => setAccountDetails(prev => ({ ...prev, statementOpeningBalance: e.target.value === '' ? undefined : Number(e.target.value) }))} className="mt-1" placeholder="Opening balance" /></div>
+                 <div><Label htmlFor="statementPeriodFrom">Statement Period From</Label><Input id="statementPeriodFrom" type="date" value={accountDetails.statementPeriodFrom ? accountDetails.statementPeriodFrom.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodFrom', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div><Label htmlFor="statementPeriodTo">Statement Period To</Label><Input id="statementPeriodTo" type="date" value={accountDetails.statementPeriodTo ? accountDetails.statementPeriodTo.slice(0, 10) : ''} onChange={(e) => handleDetailsChange('statementPeriodTo', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : '')} className="mt-1" /></div>
+                 <div className="sm:col-span-2"><Label htmlFor="statementNoteHindi">Statement Footer Note (Hindi)</Label><Textarea id="statementNoteHindi" value={accountDetails.statementNoteHindi || ''} onChange={(e) => handleDetailsChange('statementNoteHindi', e.target.value)} className="mt-1" rows={2} placeholder="हिंदी में स्टेटमेंट नोट" /></div>
+                 <div className="sm:col-span-2"><Label htmlFor="statementNoteEnglish">Statement Footer Note (English)</Label><Textarea id="statementNoteEnglish" value={accountDetails.statementNoteEnglish || accountDetails.statementNote || ''} onChange={(e) => handleDetailsChange('statementNoteEnglish', e.target.value)} className="mt-1" rows={2} placeholder="English statement note" /></div>
+               </div>
+             </section>
+
+             <section className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement PDF Management</h3>
+              <CardDescription>Inspect the reference PDF and extract the BOB World and Bank of Baroda logos into Settings. Use Import Statement Transactions below to parse the full transaction history and replace the saved list after balance validation. The source PDF is not stored.</CardDescription>
+              <div>
+                <Label htmlFor="statement-pdf-upload">Statement PDF</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button type="button" variant="outline" onClick={() => statementPdfInputRef.current?.click()}>
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    Upload PDF
+                  </Button>
+                  <input
+                    id="statement-pdf-upload"
+                    type="file"
+                    accept=".pdf"
+                    ref={statementPdfInputRef}
+                    onChange={handleStatementPdfUpload}
+                    className="hidden"
+                  />
+                  {statementPdfName && (
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span>{statementPdfName}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setStatementPdfName(null);
+                          toast({ title: "PDF Removed", description: "The statement PDF has been cleared." });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                 <p className="text-xs text-muted-foreground mt-1">The uploaded PDF is read locally for its text and logo artwork. The original file is not stored; the app saves only the extracted account fields and transactions.</p>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center"><ImageIconLucide className="mr-2 h-5 w-5 text-primary" />Manage Application Images</h3>
+              <CardDescription>The BOB World Logo uploaded here is reused in generated account statements and transaction receipt PDFs. Upload the BOB logo here if it is not already saved.</CardDescription>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {imageUploadConfig.map(config => (
+                  <div key={config.key} className="space-y-2">
+                    <Label htmlFor={`image-${config.key}`}>{config.label}</Label>
+                    <div className="flex items-center gap-2">
+                       <Input
+                        id={`image-${config.key}`}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload(config.key)}
+                        className="flex-1"
+                      />
+                       <Button type="button" variant="outline" size="icon" onClick={() => clearImage(config.key)} title="Clear image">
+                         <XCircle className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <img
+                         src={imageStates[config.key].preview}
+                         alt={`${config.label} preview`}
+                         width={config.key === 'profile' ? 80 : 150}
+                         height={config.key === 'profile' ? 80 : (config.key.includes('Banner') ? 75 : 50)}
+                        className={cn("mt-2 rounded-md border object-contain bg-muted/30", config.key === 'profile' && "rounded-full")}
+                        data-ai-hint={imageStates[config.key].defaultHint}
+                        key={imageStates[config.key].preview} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-4">
+               <h3 className="text-lg font-medium flex items-center"><IndianRupee className="mr-2 h-5 w-5 text-primary" />Master Account Balance</h3>
+               <div>
+                  <Label htmlFor="balance">Current Balance (INR)</Label>
+                  <Input id="balance" type="text" value={balance.toString()} onChange={handleBalanceChange} className="mt-1" placeholder="e.g., 75000.00" pattern="\d*(\.\d{0,2})?" />
+                  <p className="text-xs text-muted-foreground mt-1">This balance is updated by transactions. Manual edits set a new base.</p>
+                </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center"><BookOpen className="mr-2 h-5 w-5 text-primary" />Passbook Display Overrides</h3>
+              <CardDescription>Optionally override calculated values shown on the Passbook page. Leave blank to use calculated/default values.</CardDescription>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <Label htmlFor="passbookTotalIn">Total In Override</Label>
+                  <Input id="passbookTotalIn" type="text" value={passbookTotalIn} onChange={handlePassbookNumericChange(setPassbookTotalIn)} className="mt-1" placeholder="e.g., 50000.00" />
+                </div>
+                <div>
+                  <Label htmlFor="passbookTotalOut">Total Out Override</Label>
+                  <Input id="passbookTotalOut" type="text" value={passbookTotalOut} onChange={handlePassbookNumericChange(setPassbookTotalOut)} className="mt-1" placeholder="e.g., 20000.00" />
+                </div>
+                <div>
+                  <Label htmlFor="passbookClosingBalance">Closing Balance Override</Label>
+                  <Input id="passbookClosingBalance" type="text" value={passbookClosingBalance} onChange={handlePassbookNumericChange(setPassbookClosingBalance)} className="mt-1" placeholder="e.g., 100000.00" />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Manage Payees</h3>
+                <Button type="button" onClick={() => { setEditingPayee(null); setIsPayeeDialogOpen(true); }} size="sm">
+                  <UserPlus className="mr-2 h-4 w-4" /> Add New Payee
+                </Button>
+              </div>
+              {payees.length > 0 ? (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Account No.</TableHead>
+                        <TableHead>IFSC</TableHead>
+                        <TableHead>Nickname</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payees.map(p => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell>{p.accountNumber}</TableCell>
+                          <TableCell>{p.ifscCode}</TableCell>
+                          <TableCell>{p.nickname || 'N/A'}</TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => openEditPayeeDialog(p)} title="Edit Payee">
+                              <Edit3 className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => confirmDeletePayee(p)} title="Delete Payee">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No payees added yet.</p>
+              )}
+            </section>
+
+            <section className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium flex items-center"><ListPlus className="mr-2 h-5 w-5 text-primary" />Manage Transactions</h3>
+                <Button type="button" onClick={() => { setEditingTransaction(null); setIsAddTransactionOpen(true); }} size="sm">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add New
+                </Button>
+              </div>
+              {clientRenderedTransactions.length > 0 ? (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                  <TableCaption>A list of your recent transactions.</TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead> 
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientRenderedTransactions.map(t => (
+                        <TableRow key={t.id}>
+                          <TableCell className="font-mono text-xs max-w-[80px] truncate" title={t.id}>{t.id}</TableCell> 
+                          <TableCell>{t.formattedDate}</TableCell>
+                          <TableCell className="max-w-[150px] truncate" title={t.description}>{t.description}</TableCell>
+                          <TableCell className={cn(t.type === 'debit' ? 'text-red-600' : 'text-green-600')}>
+                            {t.amount.toLocaleString('en-IN')}
+                          </TableCell>
+                          <TableCell>
+                             <span className={cn("px-2 py-0.5 text-xs font-semibold rounded-full capitalize", t.type === 'debit' ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700")}>
+                                {t.type}
+                              </span>
+                          </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => openEditTransactionDialog(t)} title="Edit Transaction">
+                              <Edit3 className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => handleDeleteTransaction(t.id)} title="Delete Transaction">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                 <p className="text-sm text-muted-foreground text-center py-4">
+                  {isClient ? "No transactions yet. Add one to see it here." : "Loading transactions..."}
+                </p>
+              )}
+            </section>
+
+            <section className="space-y-4">
+                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
+                <CardDescription>Extract selectable PDF text locally. Image-only pages are processed with the bundled offline OCR engine on this device. No Genkit, generative AI, cloud OCR, or document upload is used. A successful parse replaces the saved account, balance and transaction data.</CardDescription>
+                <div>
+                    <Button
+                        type="button"
+                        onClick={() => pdfFileInputRef.current?.click()}
+                        className="w-full sm:w-auto"
+                        disabled={isProcessingPdf}
+                    >
+                        {isProcessingPdf ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                        )}
+                        {isProcessingPdf ? "Parsing statement locally..." : "Import Statement Transactions"}
+                    </Button>
+                    <input
+                        type="file"
+                        accept=".pdf"
+                        ref={pdfFileInputRef}
+                        onChange={handlePdfUpload}
+                        className="hidden"
+                        disabled={isProcessingPdf}
+                    />
+                </div>
+            </section>
+
+            <section className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium flex items-center"><MessageSquare className="mr-2 h-5 w-5 text-primary" />Manage Live Agent Chat Messages</h3>
+                    <Button type="button" onClick={openAddLiveAgentMessageDialog} size="sm">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Message
+                    </Button>
+                </div>
+                <CardDescription>Manage the messages that appear in the "Agent Live Chat" feature.</CardDescription>
+                {clientRenderedLiveMessages.length > 0 ? (
+                    <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                    <TableCaption>Messages for Agent Live Chat.</TableCaption>
+                        <TableHeader>
+                        <TableRow>
+                            <TableHead>Sender</TableHead>
+                            <TableHead>Content</TableHead>
+                            <TableHead>Timestamp</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {clientRenderedLiveMessages.map(msg => (
+                            <TableRow key={msg.id}>
+                            <TableCell className="capitalize">{msg.sender}</TableCell>
+                            <TableCell className="max-w-[200px] truncate" title={msg.content}>{msg.content}</TableCell>
+                            <TableCell>{msg.formattedTimestamp}</TableCell>
+                            <TableCell className="text-right space-x-1">
+                                <Button type="button" variant="ghost" size="icon" onClick={() => openEditLiveAgentMessageDialog(msg)} title="Edit Message">
+                                <Edit3 className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => confirmDeleteLiveAgentMessage(msg)} title="Delete Message">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                    {isClient ? "No live agent messages yet." : "Loading messages..."}
+                    </p>
+                )}
+            </section>
+
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 pt-6 border-t">
+            <Button type="submit" className="w-full sm:w-auto">
+              <Save className="mr-2 h-4 w-4" /> Save All Settings
+            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => fileInputRef.current?.click()}>
+                <UploadCloud className="mr-2 h-4 w-4" /> Import App Data
+                </Button>
+                <input
+                type="file"
+                ref={fileInputRef}
+                accept=".json"
+                onChange={handleImportData}
+                className="hidden"
+                />
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={handleExportData}>
+                <UploadCloud className="mr-2 h-4 w-4 rotate-180" /> Export App Data
+                </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </form>
+
+      {(isAddTransactionOpen || (isEditTransactionOpen && editingTransaction)) && (
+          <AddTransactionDialog
+            open={isAddTransactionOpen || isEditTransactionOpen}
+            onOpenChange={isEditTransactionOpen ? setIsEditTransactionOpen : setIsAddTransactionOpen}
+            onSaveTransaction={(data, id) => handleAddOrEditTransaction(data, id)}
+            existingTransaction={editingTransaction}
+            dialogTitle={editingTransaction ? "Edit Transaction" : "Add New Transaction"}
+            payees={payees}
+          />
+      )}
+       <AddPayeeDialog
+        open={isPayeeDialogOpen}
+        onOpenChange={setIsPayeeDialogOpen}
+        onSavePayee={handleSavePayee}
+        existingPayee={editingPayee}
+        dialogTitle={editingPayee ? "Edit Payee" : "Add New Payee"}
+      />
+      {payeeToDelete && (
+        <AlertDialog open={!!payeeToDelete} onOpenChange={() => setPayeeToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the payee "{payeeToDelete.name}".
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPayeeToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeletePayee} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Dialog for Adding/Editing Live Agent Messages */}
+      <Dialog open={isLiveAgentMessageDialogOpen} onOpenChange={(open) => {
+          setIsLiveAgentMessageDialogOpen(open);
+          if (!open) setEditingLiveAgentMessage(null);
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <FormDialogTitle>{editingLiveAgentMessage ? "Edit Message" : "Add New Message"}</FormDialogTitle>
+            <FormDialogDescription>
+              {editingLiveAgentMessage ? "Modify the details of this message." : "Enter details for the new message."}
+            </FormDialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveLiveAgentMessage}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="msg-sender" className="text-right">Sender</Label>
+                <Select value={currentMessageSender} onValueChange={(value: 'user' | 'agent' | 'system') => setCurrentMessageSender(value)}>
+                  <SelectTrigger id="msg-sender-trigger" className="col-span-3">
+                    <SelectValue placeholder="Select sender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="agent">Agent</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="msg-content" className="text-right pt-2">Content</Label>
+                <Textarea
+                  id="msg-content"
+                  value={currentMessageContent}
+                  onChange={(e) => setCurrentMessageContent(e.target.value)}
+                  className="col-span-3"
+                  placeholder="Enter message content"
+                  rows={4}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="msg-date" className="text-right">Date</Label>
+                <Input
+                  id="msg-date"
+                  type="date"
+                  value={currentMessageTimestamp}
+                  onChange={(e) => setCurrentMessageTimestamp(e.target.value)}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="msg-time" className="text-right">Time</Label>
+                <Input
+                  id="msg-time"
+                  type="time"
+                  value={currentMessageTime}
+                  onChange={(e) => setCurrentMessageTime(e.target.value)}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+            </div>
+            <FormDialogFooter>
+              <Button type="button" variant="outline" onClick={() => {
+                  setIsLiveAgentMessageDialogOpen(false);
+                  setEditingLiveAgentMessage(null);
+              }}>Cancel</Button>
+              <Button type="submit">Save Message</Button>
+            </FormDialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog for Deleting Live Agent Message */}
+      {liveAgentMessageToDelete && (
+        <AlertDialog open={!!liveAgentMessageToDelete} onOpenChange={() => setLiveAgentMessageToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The message "{liveAgentMessageToDelete.content.substring(0, 50)}..." will be permanently deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setLiveAgentMessageToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteLiveAgentMessage} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+    </div>
+  );
+}
+
+    
