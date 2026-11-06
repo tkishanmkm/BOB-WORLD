@@ -17,6 +17,7 @@ import {
   PROMO_WOMAN_PAYMENT_KEY
 } from '@/lib/constants';
 import type { AccountDetailsType } from '@/lib/types';
+import { getAccountTypeLabel } from '@/lib/account-type';
 
 export default function CurrentAccountDetailsPage() {
   const [balance, setBalance] = useState<number>(INITIAL_BALANCE);
@@ -65,7 +66,7 @@ export default function CurrentAccountDetailsPage() {
   }, []);
 
   const lastFourDigits = accountDetails.accountNumber.slice(-4);
-  const accountType = accountDetails.accountType ? `${accountDetails.accountType} account` : 'Current account';
+  const accountType = getAccountTypeLabel(accountDetails);
 
   return (
     <div className="min-h-screen bg-muted/20 pb-8">
