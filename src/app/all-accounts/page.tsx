@@ -107,7 +107,7 @@ export default function AllAccountsPage() {
               <Card className="shadow-lg bg-secondary/70 border-secondary hover:shadow-xl transition-shadow cursor-pointer">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-md font-semibold text-secondary-foreground">1 {getAccountTypeLabel(accountDetails)} account</h3>
+                    <h3 className="text-md font-semibold text-secondary-foreground">1 {getAccountTypeLabel(accountDetails)}</h3>
                     <div className="h-8 w-8 bg-white rounded-full flex items-center justify-center shadow-sm">
                        <span className="text-sm font-bold text-primary leading-none">bob</span>
                     </div>
