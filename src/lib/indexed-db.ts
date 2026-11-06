@@ -25,6 +25,21 @@ function openDatabase(): Promise<IDBDatabase> {
   return databasePromise;
 }
 
+export async function readAllAppState(): Promise<Record<string, unknown>> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
+    request.onsuccess = () => {
+      const entries: Record<string, unknown> = {};
+      for (const record of (request.result || []) as Array<{ key?: unknown; value?: unknown }>) {
+        if (typeof record.key === 'string') entries[record.key] = record.value ?? null;
+      }
+      resolve(entries);
+    };
+    request.onerror = () => reject(request.error || new Error('Could not export local app state.'));
+  });
+}
+
 export async function readAppState<T = string>(key: string): Promise<T | null> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
