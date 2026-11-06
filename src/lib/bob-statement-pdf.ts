@@ -544,5 +544,3 @@ export async function generateBobStatementPdf(options: BobStatementPdfOptions): 
 
   return doc.output('blob');
 }
-
-[executed on device: Kishan (c4aa9a86-57f1-4320-a86d-0513b6434d61)]

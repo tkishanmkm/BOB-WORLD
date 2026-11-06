@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { TransactionType, PayeeType, AccountDetailsType } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
-import { Share2, Download, Check } from 'lucide-react';
+import { Share2, Check, CircleHelp } from 'lucide-react';
 import { savePdfToDownloads } from '@/lib/statement-download';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -353,16 +353,20 @@ export function TransactionReceiptDialog({
           </div>
           {downloadError && <p role='alert' className='mx-6 mb-3 text-xs text-destructive'>{downloadError}</p>}
         </div>
-        <DialogFooter className='mt-auto border-t border-[#e2e4e8] bg-white p-3'>
-          <div className='grid w-full grid-cols-3 gap-2'>
-            <Button type='button' variant='outline' onClick={handleShareRecord} disabled={isDownloading} className='h-11 gap-1 px-2'><Share2 className='h-4 w-4' />Share</Button>
-            <DialogClose asChild><Button type='button' variant='outline' className='h-11 px-2'>Done</Button></DialogClose>
-            <Link href='/need-help' className='inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground'>Need help</Link>
+        <DialogFooter className='mt-auto border-t border-[#e2e4e8] bg-white px-6 py-4'>
+          <div className='flex w-full flex-col items-center gap-3'>
+            <Button type='button' variant='ghost' onClick={handleShareRecord} disabled={isDownloading} className='h-9 gap-2 px-4 text-base font-semibold text-[#203c60] hover:bg-[#203c60]/5'>
+              <Share2 className='h-4 w-4' />Share
+            </Button>
+            <DialogClose asChild>
+              <Button type='button' className='h-14 w-full rounded-full bg-[#203c60] text-base font-semibold text-white hover:bg-[#182f4d]'>Done</Button>
+            </DialogClose>
+            <Link href='/need-help' className='inline-flex h-9 items-center justify-center gap-2 text-sm font-semibold text-[#203c60]'>
+              <CircleHelp className='h-4 w-4' />Need help?
+            </Link>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-[executed on device: Kishan (c4aa9a86-57f1-4320-a86d-0513b6434d61)]

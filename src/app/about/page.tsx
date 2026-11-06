@@ -9,7 +9,7 @@ export default function AboutPage() {
           <CardTitle>About BOB World</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Version 3.8.7</p>
+          <p>Version 3.9.0</p>
           <p>Package Name: com.bankofbaroda.mconnect</p>
           <p className="mt-4">BOB World - Your trusted financial partner.</p>
         </CardContent>
