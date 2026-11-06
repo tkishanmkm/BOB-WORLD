@@ -9,11 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MoreHorizontal, RefreshCw, IndianRupee } from 'lucide-react';
 import { format } from 'date-fns';
-import { INITIAL_BALANCE, BALANCE_STORAGE_KEY, FD_BANNER_KEY, RD_BANNER_KEY } from '@/lib/constants';
+import { INITIAL_BALANCE, BALANCE_STORAGE_KEY, FD_BANNER_KEY, RD_BANNER_KEY, INITIAL_ACCOUNT_DETAILS, ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+import type { AccountDetailsType } from '@/lib/types';
+import { getAccountTypeLabel } from '@/lib/account-type';
 
 export default function AllAccountsPage() {
   const [balance, setBalance] = useState<number>(INITIAL_BALANCE);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [accountDetails, setAccountDetails] = useState<AccountDetailsType>(INITIAL_ACCOUNT_DETAILS);
   const [fdBannerSrc, setFdBannerSrc] = useState('https://placehold.co/600x250.png');
   const [rdBannerSrc, setRdBannerSrc] = useState('https://placehold.co/600x250.png');
 
@@ -27,6 +30,15 @@ export default function AllAccountsPage() {
       }
     }
     setLastUpdated(format(new Date(), "MMM dd, yyyy, hh:mm a"));
+    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+    if (storedAccountDetails) {
+      try {
+        setAccountDetails({ ...INITIAL_ACCOUNT_DETAILS, ...JSON.parse(storedAccountDetails) as Partial<AccountDetailsType> });
+      } catch (error) {
+        console.error('Failed to parse saved account details:', error);
+        setAccountDetails(INITIAL_ACCOUNT_DETAILS);
+      }
+    }
 
     const storedFdBanner = localStorage.getItem(FD_BANNER_KEY);
     if (storedFdBanner && storedFdBanner.startsWith('data:image')) {
@@ -95,7 +107,7 @@ export default function AllAccountsPage() {
               <Card className="shadow-lg bg-secondary/70 border-secondary hover:shadow-xl transition-shadow cursor-pointer">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-md font-semibold text-secondary-foreground">1 Current accounts</h3>
+                    <h3 className="text-md font-semibold text-secondary-foreground">1 {getAccountTypeLabel(accountDetails)} account</h3>
                     <div className="h-8 w-8 bg-white rounded-full flex items-center justify-center shadow-sm">
                        <span className="text-sm font-bold text-primary leading-none">bob</span>
                     </div>
