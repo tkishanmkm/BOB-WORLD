@@ -92,6 +92,26 @@ export default function AccountStatementPage() {
   }, [transactions, fromDate, toDate]);
 
   const formatDateForDisplay = (date?: Date) => date ? format(date, 'dd-MM-yyyy') : 'Select Date';
+  const visibleTransactions = useMemo(() => {
+    if (!fromDate || !toDate) return [];
+    const from = new Date(fromDate); from.setHours(0, 0, 0, 0);
+    const to = new Date(toDate); to.setHours(23, 59, 59, 999);
+    return transactions
+      .filter(tx => {
+        const time = new Date(tx.date).getTime();
+        return Number.isFinite(time) && time >= from.getTime() && time <= to.getTime();
+      })
+      .slice()
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, fromDate, toDate]);
+
+  const periodTotalIn = useMemo(() => visibleTransactions
+    .filter(tx => tx.type === 'credit')
+    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0), [visibleTransactions]);
+  const periodTotalOut = useMemo(() => visibleTransactions
+    .filter(tx => tx.type === 'debit')
+    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0), [visibleTransactions]);
+
 
   const handleDownload = async () => {
     if (!fromDate || !toDate) {
@@ -221,6 +241,42 @@ export default function AccountStatementPage() {
             {!bobWorldLogo && (
               <p className="text-xs text-amber-700">BOB World logo is not set. Upload it in Settings to include it in the PDF.</p>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md">
+          <CardContent className="p-0">
+            <div className="border-b p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold">Transactions in selected period</h2>
+                <span className="text-xs text-muted-foreground">{visibleTransactions.length} entries</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-emerald-50 p-3">
+                  <p className="text-xs text-emerald-800">Total In</p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-900">₹{periodTotalIn.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+                <div className="rounded-lg bg-rose-50 p-3">
+                  <p className="text-xs text-rose-800">Total Out</p>
+                  <p className="mt-1 text-sm font-semibold text-rose-900">₹{periodTotalOut.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+            </div>
+            <div className="max-h-[420px] overflow-y-auto divide-y">
+              {visibleTransactions.length ? visibleTransactions.map(tx => (
+                <div key={tx.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium break-words">{tx.description || 'Transaction'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{Number.isFinite(new Date(tx.date).getTime()) ? format(new Date(tx.date), 'dd-MM-yyyy, hh:mm a') : tx.date}</p>
+                  </div>
+                  <p className={`shrink-0 text-sm font-semibold tabular-nums ${tx.type === 'credit' ? 'text-emerald-700' : 'text-foreground'}`}>
+                    {tx.type === 'credit' ? '+' : '−'}₹{Math.abs(Number(tx.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )) : (
+                <p className="p-6 text-center text-sm text-muted-foreground">No saved transactions in this date range.</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </main>
