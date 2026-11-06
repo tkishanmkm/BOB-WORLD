@@ -184,7 +184,7 @@ function hindiImage(
   const cssWidth = Math.max(8, widthMm * pixelsPerMm);
   const fontPixels = fontSizePt * 96 / 72;
   const linePixels = fontPixels * 1.34;
-  const fontFamily = '"Nirmala UI", "Noto Sans Devanagari", "Mangal", "Arial Unicode MS", sans-serif';
+  const fontFamily = '"Noto Sans Devanagari", "Devanagari Sangam MN", "Nirmala UI", "Mangal", "Arial Unicode MS", sans-serif';
 
   const measureCanvas = document.createElement('canvas');
   measureCanvas.width = Math.ceil(cssWidth);
@@ -524,6 +524,7 @@ export async function generateBobStatementPdf(options: BobStatementPdfOptions): 
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   await registerStatementFonts(doc);
+  if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready;
 
   const [headerArtwork, accountTitleArtwork, noteArtwork, bottomGradient] = await Promise.all([
     fetchPngDataUri('/assets/statement/reference-header.png'),
