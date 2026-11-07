@@ -294,8 +294,10 @@ export function TransactionReceiptDialog({
       row('Transfer date', formattedDateTime, true);
       row('Reference ID', transaction.referenceNumber || transaction.id || '-');
 
-      const ref = String(transaction.referenceNumber || transaction.id || 'BOB-TRANSACTION').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
-      const fileName = 'BOB-World-Receipt-' + ref + '.pdf';
+      const rawReference = String(transaction.referenceNumber || transaction.id || '');
+      const referenceDigits = rawReference.replace(/\D/g, '');
+      const receiptReference = (referenceDigits || String(Date.now())).slice(-12).padStart(12, '0');
+      const fileName = 'Receipt' + receiptReference + '.pdf';
       const blob = doc.output('blob');
       let savedLocation = 'Downloads';
       if (shareAfterSave && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
