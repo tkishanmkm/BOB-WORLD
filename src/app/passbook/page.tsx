@@ -167,8 +167,9 @@ export default function PassbookPage() {
         bobWorldLogo,
         bankLogo,
       });
-      const lastFour = accountDetails.accountNumber.replace(/\D/g, '').slice(-4) || 'XXXX';
-      const fileName = 'BOBWORLD_STMT_XX' + lastFour + '_' + format(new Date(), 'ddMMyyyy') + '.pdf';
+      const accountDigits = accountDetails.accountNumber.replace(/\D/g, '');
+      if (!accountDigits) throw new Error('Add a valid account number in Settings before downloading the statement.');
+      const fileName = accountDigits + '.pdf';
       const savedLocation = await saveStatementPdf(pdfBlob, fileName);
       const shareSheetOpened = savedLocation.includes('share sheet');
       const shareSheetCancelled = savedLocation === 'Share sheet closed without saving';
