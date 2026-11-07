@@ -31,12 +31,9 @@ export function TransactionListItem({ transaction, onTransactionSelect }: Transa
     ? BobLogoPlaceholder
     : MiscIconPlaceholder;
 
-  const transactionDateTime = new Date(transaction.date);
-  const transactionTime = transactionDateTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const transactionDate = Number.isFinite(new Date(transaction.date).getTime())
+    ? new Date(transaction.date).toLocaleDateString('en-GB').replaceAll('/', '-')
+    : transaction.date;
 
   let transactionDisplaySubType = "";
   if (transaction.transactionMainType?.toLowerCase().includes("neft")) transactionDisplaySubType = "NEFT";
@@ -65,7 +62,7 @@ export function TransactionListItem({ transaction, onTransactionSelect }: Transa
                 {transaction.description}
               </p>
               <div className="flex items-center space-x-2">
-                <p className="text-xs text-muted-foreground">{transactionTime}</p>
+                <p className="text-xs text-muted-foreground">{transactionDate}</p>
                 {transactionDisplaySubType && (
                   <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm">
                     {transactionDisplaySubType}
