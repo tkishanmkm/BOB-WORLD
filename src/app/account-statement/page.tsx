@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Home, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Home, ChevronDown, Lightbulb } from 'lucide-react';
 import { format } from 'date-fns';
 import type { AccountDetailsType, TransactionType } from '@/lib/types';
 import {
