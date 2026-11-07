@@ -36,6 +36,7 @@ import {
   STATEMENT_BANK_LOGO_KEY,
   OTP_NOTIFICATION_AVATAR_KEY,
   TPIN_HASH_STORAGE_KEY,
+  LOGIN_MPIN_HASH_STORAGE_KEY,
 } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText, ShieldCheck } from 'lucide-react';
@@ -111,6 +112,10 @@ export default function SettingsPage() {
   const [confirmTransferTpin, setConfirmTransferTpin] = useState('');
   const [isTransferTpinConfigured, setIsTransferTpinConfigured] = useState(false);
   const [isSavingTransferTpin, setIsSavingTransferTpin] = useState(false);
+  const [loginMpin, setLoginMpin] = useState('');
+  const [confirmLoginMpin, setConfirmLoginMpin] = useState('');
+  const [isLoginMpinConfigured, setIsLoginMpinConfigured] = useState(false);
+  const [isSavingLoginMpin, setIsSavingLoginMpin] = useState(false);
 
   const [isPayeeDialogOpen, setIsPayeeDialogOpen] = useState(false);
   const [editingPayee, setEditingPayee] = useState<PayeeType | null>(null);
@@ -166,6 +171,7 @@ export default function SettingsPage() {
       if (cancelled) return;
       setIsClient(true);
       setIsTransferTpinConfigured(Boolean(localStorage.getItem(TPIN_HASH_STORAGE_KEY)));
+      setIsLoginMpinConfigured(Boolean(localStorage.getItem(LOGIN_MPIN_HASH_STORAGE_KEY)));
     }).catch(error => console.error('Could not restore Settings state from IndexedDB:', error));
     return () => { cancelled = true; };
   }, []);
@@ -340,6 +346,32 @@ export default function SettingsPage() {
 
   const handleDetailsChange = (field: keyof AccountDetailsType, value: string) => {
     setAccountDetails(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveLoginMpin = async () => {
+    if (!/^\d{4}$/.test(loginMpin)) {
+      toast({ title: 'Invalid login MPIN', description: 'Enter exactly four digits.', variant: 'destructive' });
+      return;
+    }
+    if (loginMpin !== confirmLoginMpin) {
+      toast({ title: 'MPIN mismatch', description: 'The two MPIN entries do not match.', variant: 'destructive' });
+      return;
+    }
+    setIsSavingLoginMpin(true);
+    try {
+      const verifier = await createTpinVerifier(loginMpin);
+      localStorage.setItem(LOGIN_MPIN_HASH_STORAGE_KEY, JSON.stringify(verifier));
+      await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+      setIsLoginMpinConfigured(true);
+      setLoginMpin('');
+      setConfirmLoginMpin('');
+      toast({ title: 'Login MPIN saved', description: 'A salted MPIN verifier is stored locally; the MPIN itself is not stored.' });
+    } catch (error) {
+      console.error('Could not save login MPIN:', error);
+      toast({ title: 'MPIN could not be saved', description: 'Secure local cryptography is unavailable on this device.', variant: 'destructive' });
+    } finally {
+      setIsSavingLoginMpin(false);
+    }
   };
 
   const handleSaveTransferTpin = async () => {
@@ -934,6 +966,35 @@ export default function SettingsPage() {
             <CardDescription>Choose a section to expand it. Related fields and tools are kept together, and your existing save, import and export actions remain available.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <details className="group rounded-xl border bg-card p-4 shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Login Security & MPIN</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div className="rounded-lg border p-3">
+                  <p className="text-sm font-semibold">Login MPIN</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Set a four-digit MPIN required to open the app. Only a salted, iterated verifier is stored locally.</p>
+                  <p className={`mt-2 text-xs font-medium ${isLoginMpinConfigured ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {isLoginMpinConfigured ? 'Login MPIN is configured' : 'Login MPIN is not configured'}
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="loginMpin">New 4-digit MPIN</Label>
+                      <Input id="loginMpin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={loginMpin} onChange={event => setLoginMpin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1" placeholder="Enter MPIN" />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmLoginMpin">Confirm MPIN</Label>
+                      <Input id="confirmLoginMpin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={confirmLoginMpin} onChange={event => setConfirmLoginMpin(event.target.value.replace(/\D/g, '').slice(0, 4))} className="mt-1" placeholder="Re-enter MPIN" />
+                    </div>
+                  </div>
+                  <Button type="button" className="mt-3 w-full sm:w-auto" onClick={handleSaveLoginMpin} disabled={isSavingLoginMpin}>
+                    {isSavingLoginMpin ? 'Saving MPIN...' : isLoginMpinConfigured ? 'Update Login MPIN' : 'Set Login MPIN'}
+                  </Button>
+                  <p className="mt-2 text-xs text-muted-foreground">Face ID is not enabled unless biometric enrolment is completed. Use MPIN when Face ID is unavailable.</p>
+                </div>
+              </div>
+            </details>
             <details className="group rounded-xl border bg-card p-4 shadow-sm" open>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Account Holder Details</span>
