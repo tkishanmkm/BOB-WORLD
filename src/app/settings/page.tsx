@@ -931,11 +931,17 @@ export default function SettingsPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Account Configuration</CardTitle>
-            <CardDescription>Manage your account details, balance, transactions, payees, overrides and application images.</CardDescription>
+            <CardDescription>Choose a section to expand it. Related fields and tools are kept together, and your existing save, import and export actions remain available.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <section className="space-y-4">
-              <h3 className="text-lg font-medium flex items-center"><UserCircle2 className="mr-2 h-5 w-5 text-primary" />Account Holder Details</h3>
+            <details className="rounded-xl border bg-card p-4 shadow-sm" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Account Holder Details</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+              <h3 className="hidden"><UserCircle2 className="mr-2 h-5 w-5 text-primary" />Account Holder Details</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="name">Full Name</Label>
@@ -986,10 +992,18 @@ export default function SettingsPage() {
                   <Input id="phoneNumber" type="tel" value={accountDetails.phoneNumber || ''} onChange={(e) => handleDetailsChange('phoneNumber', e.target.value)} className="mt-1" placeholder="e.g., +919876543210" />
                 </div>
               </div>
-            </section>
+            
+              </div>
+            </details>
 
-             <section className="space-y-4">
-               <h3 className="text-lg font-medium flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary" />Fund Transfer Security</h3>
+             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Fund Transfer Security</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+               <h3 className="hidden"><ShieldCheck className="mr-2 h-5 w-5 text-primary" />Fund Transfer Security</h3>
                <CardDescription>Set a separate four-digit TPIN for the local IMPS transfer flow. The app stores a salted PBKDF2 verifier, not the TPIN in plain text.</CardDescription>
                <div className="rounded-xl border p-4 space-y-3">
                  <p className="text-sm font-medium">{isTransferTpinConfigured ? 'Transfer TPIN is configured on this device.' : 'No transfer TPIN is configured yet.'}</p>
@@ -1002,10 +1016,18 @@ export default function SettingsPage() {
                    <p className="text-xs text-muted-foreground">Use a TPIN different from your login PIN. This local flow does not connect to the bank.</p>
                  </div>
                </div>
-             </section>
+             
+              </div>
+            </details>
 
-             <section className="space-y-4">
-               <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement Account & Branch Fields</h3>
+             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Statement Account & Branch Fields</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+               <h3 className="hidden"><FileText className="mr-2 h-5 w-5 text-primary" />Statement Account & Branch Fields</h3>
                <CardDescription>Complete any detail that is missing from the uploaded statement. These values are used when generating a new statement PDF.</CardDescription>
                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                  <div><Label htmlFor="customerAddress">Customer Address</Label><Input id="customerAddress" value={accountDetails.customerAddress || ''} onChange={(e) => handleDetailsChange('customerAddress', e.target.value)} className="mt-1" placeholder="Customer postal address" /></div>
@@ -1023,10 +1045,18 @@ export default function SettingsPage() {
                  <div className="sm:col-span-2"><Label htmlFor="statementNoteHindi">Statement Footer Note (Hindi)</Label><Textarea id="statementNoteHindi" value={accountDetails.statementNoteHindi || ''} onChange={(e) => handleDetailsChange('statementNoteHindi', e.target.value)} className="mt-1" rows={2} placeholder="हिंदी में स्टेटमेंट नोट" /></div>
                  <div className="sm:col-span-2"><Label htmlFor="statementNoteEnglish">Statement Footer Note (English)</Label><Textarea id="statementNoteEnglish" value={accountDetails.statementNoteEnglish || accountDetails.statementNote || ''} onChange={(e) => handleDetailsChange('statementNoteEnglish', e.target.value)} className="mt-1" rows={2} placeholder="English statement note" /></div>
                </div>
-             </section>
+             
+              </div>
+            </details>
 
-             <section className="space-y-4">
-              <h3 className="text-lg font-medium flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Statement PDF Management</h3>
+             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Statement PDF Management</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+              <h3 className="hidden"><FileText className="mr-2 h-5 w-5 text-primary" />Statement PDF Management</h3>
               <CardDescription>Inspect the reference PDF and extract the BOB World and Bank of Baroda logos into Settings. Use Import Statement Transactions below to parse the full transaction history and replace the saved list after balance validation. The source PDF is not stored.</CardDescription>
               <div>
                 <Label htmlFor="statement-pdf-upload">Statement PDF</Label>
@@ -1064,10 +1094,18 @@ export default function SettingsPage() {
                 </div>
                  <p className="text-xs text-muted-foreground mt-1">The uploaded PDF is read locally for its text and logo artwork. The original file is not stored; the app saves only the extracted account fields and transactions.</p>
               </div>
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
-              <h3 className="text-lg font-medium flex items-center"><ImageIconLucide className="mr-2 h-5 w-5 text-primary" />Manage Application Images</h3>
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Application Images</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+              <h3 className="hidden"><ImageIconLucide className="mr-2 h-5 w-5 text-primary" />Manage Application Images</h3>
               <CardDescription>The BOB World Logo uploaded here is reused in generated account statements and transaction receipt PDFs. Upload the BOB logo here if it is not already saved.</CardDescription>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {imageUploadConfig.map(config => (
@@ -1097,19 +1135,35 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
-               <h3 className="text-lg font-medium flex items-center"><IndianRupee className="mr-2 h-5 w-5 text-primary" />Master Account Balance</h3>
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Master Account Balance</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+               <h3 className="hidden"><IndianRupee className="mr-2 h-5 w-5 text-primary" />Master Account Balance</h3>
                <div>
                   <Label htmlFor="balance">Current Balance (INR)</Label>
                   <Input id="balance" type="text" value={balance.toString()} onChange={handleBalanceChange} className="mt-1" placeholder="e.g., 75000.00" pattern="\d*(\.\d{0,2})?" />
                   <p className="text-xs text-muted-foreground mt-1">This balance is updated by transactions. Manual edits set a new base.</p>
                 </div>
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
-              <h3 className="text-lg font-medium flex items-center"><BookOpen className="mr-2 h-5 w-5 text-primary" />Passbook Display Overrides</h3>
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Passbook Display Overrides</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+              <h3 className="hidden"><BookOpen className="mr-2 h-5 w-5 text-primary" />Passbook Display Overrides</h3>
               <CardDescription>Optionally override calculated values shown on the Passbook page. Leave blank to use calculated/default values.</CardDescription>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
@@ -1125,11 +1179,19 @@ export default function SettingsPage() {
                   <Input id="passbookClosingBalance" type="text" value={passbookClosingBalance} onChange={handlePassbookNumericChange(setPassbookClosingBalance)} className="mt-1" placeholder="e.g., 100000.00" />
                 </div>
               </div>
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Payees</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Manage Payees</h3>
+                <h3 className="hidden"><Users className="mr-2 h-5 w-5 text-primary" />Manage Payees</h3>
                 <Button type="button" onClick={() => { setEditingPayee(null); setIsPayeeDialogOpen(true); }} size="sm">
                   <UserPlus className="mr-2 h-4 w-4" /> Add New Payee
                 </Button>
@@ -1169,11 +1231,19 @@ export default function SettingsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">No payees added yet.</p>
               )}
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Transactions</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium flex items-center"><ListPlus className="mr-2 h-5 w-5 text-primary" />Manage Transactions</h3>
+                <h3 className="hidden"><ListPlus className="mr-2 h-5 w-5 text-primary" />Manage Transactions</h3>
                 <Button type="button" onClick={() => { setEditingTransaction(null); setIsAddTransactionOpen(true); }} size="sm">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add New
                 </Button>
@@ -1224,10 +1294,18 @@ export default function SettingsPage() {
                   {isClient ? "No transactions yet. Add one to see it here." : "Loading transactions..."}
                 </p>
               )}
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
-                 <h3 className="text-lg font-medium flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Statement Transaction Import</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
+                 <h3 className="hidden"><FileUp className="mr-2 h-5 w-5 text-primary" />Local Statement Transaction Import</h3>
                 <CardDescription>Extract selectable PDF text locally. Image-only pages are processed with the bundled offline OCR engine on this device. No Genkit, generative AI, cloud OCR, or document upload is used. A successful parse replaces the saved account, balance and transaction data.</CardDescription>
                 <div>
                     <Button
@@ -1252,11 +1330,19 @@ export default function SettingsPage() {
                         disabled={isProcessingPdf}
                     />
                 </div>
-            </section>
+            
+              </div>
+            </details>
 
-            <section className="space-y-4">
+            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Live Agent Chat Messages</span>
+                <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="mt-4 space-y-4">
+
                 <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium flex items-center"><MessageSquare className="mr-2 h-5 w-5 text-primary" />Manage Live Agent Chat Messages</h3>
+                    <h3 className="hidden"><MessageSquare className="mr-2 h-5 w-5 text-primary" />Manage Live Agent Chat Messages</h3>
                     <Button type="button" onClick={openAddLiveAgentMessageDialog} size="sm">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add New Message
                     </Button>
@@ -1298,7 +1384,9 @@ export default function SettingsPage() {
                     {isClient ? "No live agent messages yet." : "Loading messages..."}
                     </p>
                 )}
-            </section>
+            
+              </div>
+            </details>
 
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 pt-6 border-t">
