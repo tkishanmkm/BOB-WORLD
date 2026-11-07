@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, Home, Lightbulb, CheckCircle2, ChevronDown, CalendarDays, ArrowRightLeft } from 'lucide-react';
+import { ArrowLeft, Home, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import type { AccountDetailsType, TransactionType } from '@/lib/types';
 import {
@@ -19,7 +17,7 @@ import {
   STATEMENT_BANK_LOGO_KEY,
 } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
-import { ensureStatementBrandAssets, savePdfToDownloads } from '@/lib/statement-download';
+import { ensureStatementBrandAssets, saveStatementPdf } from '@/lib/statement-download';
 import { generateBobStatementPdf } from '@/lib/bob-statement-pdf';
 import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 
@@ -91,7 +89,6 @@ export default function AccountStatementPage() {
     }).length;
   }, [transactions, fromDate, toDate]);
 
-  const formatDateForDisplay = (date?: Date) => date ? format(date, 'dd-MM-yyyy') : 'Select Date';
   const visibleTransactions = useMemo(() => {
     if (!fromDate || !toDate) return [];
     const from = new Date(fromDate); from.setHours(0, 0, 0, 0);
@@ -105,12 +102,12 @@ export default function AccountStatementPage() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, fromDate, toDate]);
 
-  const periodTotalIn = useMemo(() => visibleTransactions
-    .filter(tx => tx.type === 'credit')
-    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0), [visibleTransactions]);
-  const periodTotalOut = useMemo(() => visibleTransactions
-    .filter(tx => tx.type === 'debit')
-    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0), [visibleTransactions]);
+  const { periodTotalIn, periodTotalOut } = useMemo(() => transactions.reduce((totals, tx) => {
+    const amount = Math.abs(Number(tx.amount) || 0);
+    if (tx.type === 'credit') totals.periodTotalIn += amount;
+    else if (tx.type === 'debit') totals.periodTotalOut += amount;
+    return totals;
+  }, { periodTotalIn: 0, periodTotalOut: 0 }), [transactions]);
 
 
   const handleDownload = async () => {
@@ -142,10 +139,12 @@ export default function AccountStatementPage() {
       if (!statementAccountDigits) throw new Error('Add a valid account number in Settings before downloading the statement.');
       const fileName = statementAccountDigits + '.pdf';
 
-      const savedLocation = await savePdfToDownloads(pdfBlob, fileName);
+      const savedLocation = await saveStatementPdf(pdfBlob, fileName);
+      const shareSheetOpened = savedLocation.includes('share sheet');
+      const shareSheetCancelled = savedLocation === 'Share sheet closed without saving';
       toast({
-        title: 'Statement PDF downloaded',
-        description: fileName + ' saved to ' + savedLocation + '. Only the PDF file was exported.',
+        title: shareSheetCancelled ? 'Statement not saved' : shareSheetOpened ? 'Save statement to Files' : 'Statement PDF downloaded',
+        description: shareSheetOpened ? fileName + ' is ready in the share sheet. Choose Save to Files.' : shareSheetCancelled ? 'The share sheet was closed before saving.' : fileName + ' saved to ' + savedLocation + '. Only the PDF file was exported.',
       });
     } catch (error) {
       console.error('Statement PDF generation failed:', error);
@@ -184,14 +183,6 @@ export default function AccountStatementPage() {
               </div>
               Account statement
             </div>
-            <div className="flex items-start text-sm text-muted-foreground">
-              <CheckCircle2 className="h-5 w-5 text-primary mr-2.5 mt-0.5 shrink-0" />
-              <p>Your statement PDF is generated from the account details and transactions saved in this app.</p>
-            </div>
-            <div className="flex items-start text-sm text-muted-foreground">
-              <CheckCircle2 className="h-5 w-5 text-primary mr-2.5 mt-0.5 shrink-0" />
-              <p>Statement logos and account fields are managed in Settings. The uploaded source PDF is not reused as the output.</p>
-            </div>
           </CardContent>
         </Card>
 
@@ -205,37 +196,14 @@ export default function AccountStatementPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0">
                 <Label htmlFor="from-date" className="text-xs text-muted-foreground">From</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" id="from-date" className="w-full justify-between mt-1 h-11 font-normal">
-                      <span>{formatDateForDisplay(fromDate)}</span>
-                      <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={fromDate} onSelect={setFromDate}
-                      disabled={(date) => date > new Date() || (toDate ? date > toDate : false)} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <input id="from-date" type="date" value={fromDate ? format(fromDate, 'yyyy-MM-dd') : ''} max={toDate ? format(toDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')} onChange={event => setFromDate(event.target.value ? new Date(event.target.value + 'T00:00:00') : undefined)} className="mt-1 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm" />
               </div>
-              <div className="self-end pb-2.5"><ArrowRightLeft className="h-5 w-5 text-muted-foreground" /></div>
-              <div className="flex-1">
+              <div className="min-w-0">
                 <Label htmlFor="to-date" className="text-xs text-muted-foreground">To</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" id="to-date" className="w-full justify-between mt-1 h-11 font-normal">
-                      <span>{formatDateForDisplay(toDate)}</span>
-                      <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={toDate} onSelect={setToDate}
-                      disabled={(date) => date > new Date() || (fromDate ? date < fromDate : false)} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <input id="to-date" type="date" value={toDate ? format(toDate, 'yyyy-MM-dd') : ''} min={fromDate ? format(fromDate, 'yyyy-MM-dd') : undefined} max={format(new Date(), 'yyyy-MM-dd')} onChange={event => setToDate(event.target.value ? new Date(event.target.value + 'T00:00:00') : undefined)} className="mt-1 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm" />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{visibleCount} saved transaction{visibleCount === 1 ? '' : 's'} in the selected period.</p>
@@ -249,8 +217,8 @@ export default function AccountStatementPage() {
           <CardContent className="p-0">
             <div className="border-b p-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="font-semibold">Transactions in selected period</h2>
-                <span className="text-xs text-muted-foreground">{visibleTransactions.length} entries</span>
+                <h2 className="font-semibold">All account transactions</h2>
+                <span className="text-xs text-muted-foreground">{transactions.length} entries in account history</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-emerald-50 p-3">
