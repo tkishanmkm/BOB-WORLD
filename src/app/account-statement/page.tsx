@@ -263,7 +263,7 @@ export default function AccountStatementPage() {
                 <div key={tx.id} className="flex items-start justify-between gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium break-words">{tx.description || 'Transaction'}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{Number.isFinite(new Date(tx.date).getTime()) ? format(new Date(tx.date), 'dd-MM-yyyy, hh:mm a') : tx.date}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{Number.isFinite(new Date(tx.date).getTime()) ? format(new Date(tx.date), 'dd-MM-yyyy') : tx.date}</p>
                   </div>
                   <p className={`shrink-0 text-sm font-semibold tabular-nums ${tx.type === 'credit' ? 'text-emerald-700' : 'text-foreground'}`}>
                     {tx.type === 'credit' ? '+' : '−'}₹{Math.abs(Number(tx.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
