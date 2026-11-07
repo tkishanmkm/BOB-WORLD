@@ -176,22 +176,22 @@ export default function LoginPage() {
 
   return (
     <div className="flex h-[100svh] min-h-0 flex-col overflow-hidden bg-white text-[#244d78]">
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <section className="shrink-0 rounded-b-[30px] bg-white px-5 pb-4 pt-[max(8px,env(safe-area-inset-top))] shadow-[0_14px_28px_rgba(30,55,85,0.07)]">
-          <div className="mx-auto flex h-[clamp(48px,7.5svh,64px)] w-full max-w-[360px] items-center justify-center gap-4">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[clamp(118px,16svh,148px)]">
+        <section className="shrink-0 rounded-b-[30px] bg-white px-5 pb-3 pt-2 shadow-[0_14px_28px_rgba(30,55,85,0.07)]">
+          <div className="mx-auto flex h-[clamp(44px,6svh,54px)] w-full max-w-[360px] items-center justify-center gap-4">
             <img
               src="/assets/branding/bob-world-logo.png"
               alt="BOB World"
-              className="h-[clamp(38px,6svh,50px)] w-[clamp(88px,27vw,108px)] object-contain"
+              className="h-[clamp(36px,5.4svh,46px)] w-[clamp(88px,27vw,108px)] object-contain"
             />
             <img
               src="/assets/branding/bank-of-baroda-logo.png"
               alt="Bank of Baroda"
-              className="h-[clamp(36px,5.7svh,48px)] w-[clamp(150px,46vw,184px)] object-contain"
+              className="h-[clamp(34px,5.1svh,44px)] w-[clamp(150px,46vw,184px)] object-contain"
             />
           </div>
 
-          <div className="relative mt-2 h-[clamp(82px,14svh,124px)] w-full overflow-hidden rounded-[18px] border border-[#e6e8eb] bg-[#f7f7f7]">
+          <div className="relative mt-1 h-[clamp(76px,11svh,104px)] w-full overflow-hidden rounded-[18px] border border-[#e6e8eb] bg-[#f7f7f7]">
             {loginBanners.map((src, index) => (
               <Image
                 key={src + index}
@@ -209,7 +209,7 @@ export default function LoginPage() {
           </div>
 
           {loginBanners.length > 1 && (
-            <div className="mt-2 flex items-center justify-center gap-[5px]" aria-label="Login banner pages">
+            <div className="mt-1 flex items-center justify-center gap-[5px]" aria-label="Login banner pages">
               {loginBanners.map((_, index) => (
                 <button
                   key={`banner-dot-${index}`}
@@ -225,7 +225,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="mt-4 flex min-h-[38px] items-center justify-between gap-3">
+          <div className="mt-2 flex min-h-[34px] items-center justify-between gap-3">
             <h1 className="truncate text-[clamp(22px,3.1svh,27px)] font-bold leading-tight tracking-[-0.5px] text-[#244d78]">
               Hi {fullName}!
             </h1>
@@ -237,7 +237,7 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col items-stretch justify-evenly overflow-hidden px-5 py-2">
+        <section className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col items-stretch justify-evenly overflow-hidden px-5 py-1">
           <p className="mb-2 text-center text-[clamp(15px,2svh,17px)] font-bold text-[#244d78]">
             Use login PIN or face ID
           </p>
@@ -284,7 +284,7 @@ export default function LoginPage() {
             Unlock/Forgot login PIN?
           </button>
 
-          <div className="mt-3 flex items-start justify-center gap-4">
+          <div className="mt-2 flex items-start justify-center gap-4">
             <LoginAction icon={QrCode} label="Scan QR" onClick={() => router.push("/scan")} />
             <LoginAction icon={Eye} label="Quick view balance" onClick={() => router.push("/all-accounts")} />
             <LoginAction icon={MoreHorizontal} label="More" onClick={() => router.push("/more")} />
@@ -304,7 +304,7 @@ export default function LoginPage() {
         </section>
       </main>
 
-      <footer className="shrink-0 rounded-t-[30px] bg-white px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_28px_rgba(20,40,65,0.08)]">
+      <footer className="fixed inset-x-0 bottom-0 z-30 min-h-[clamp(112px,15svh,138px)] rounded-t-[30px] bg-white px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_28px_rgba(20,40,65,0.08)]">
         <div className="mx-auto grid w-full max-w-[430px] grid-cols-4 gap-2">
           <FooterAction icon={Smartphone} label="Cash on mobile" onClick={() => router.push("/recharge")} />
           <FooterAction icon={CreditCard} label="Recharge & bill pay" onClick={() => router.push("/bill-pay")} />
