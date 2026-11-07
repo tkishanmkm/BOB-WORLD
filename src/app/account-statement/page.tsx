@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Home, ChevronDown, Lightbulb } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ArrowLeft, Home, ChevronDown, Lightbulb, CalendarDays, ArrowRightLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import type { AccountDetailsType, TransactionType } from '@/lib/types';
 import {
@@ -78,6 +80,8 @@ export default function AccountStatementPage() {
     }).catch(error => console.error('Could not restore statement data from IndexedDB:', error));
     return () => { cancelled = true; };
   }, [toast]);
+
+  const formatDateForDisplay = (date?: Date) => date ? format(date, 'dd-MM-yyyy') : 'Select Date';
 
   const visibleCount = useMemo(() => {
     if (!fromDate || !toDate) return 0;
@@ -196,14 +200,37 @@ export default function AccountStatementPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
                 <Label htmlFor="from-date" className="text-xs text-muted-foreground">From</Label>
-                <input id="from-date" type="date" value={fromDate ? format(fromDate, 'yyyy-MM-dd') : ''} max={toDate ? format(toDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')} onChange={event => setFromDate(event.target.value ? new Date(event.target.value + 'T00:00:00') : undefined)} className="mt-1 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" id="from-date" className="w-full justify-between mt-1 h-11 font-normal">
+                      <span>{formatDateForDisplay(fromDate)}</span>
+                      <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={fromDate} onSelect={setFromDate}
+                      disabled={(date) => date > new Date() || (toDate ? date > toDate : false)} initialFocus />
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="min-w-0">
+              <div className="self-end pb-2.5 shrink-0"><ArrowRightLeft className="h-5 w-5 text-muted-foreground" /></div>
+              <div className="flex-1 min-w-0">
                 <Label htmlFor="to-date" className="text-xs text-muted-foreground">To</Label>
-                <input id="to-date" type="date" value={toDate ? format(toDate, 'yyyy-MM-dd') : ''} min={fromDate ? format(fromDate, 'yyyy-MM-dd') : undefined} max={format(new Date(), 'yyyy-MM-dd')} onChange={event => setToDate(event.target.value ? new Date(event.target.value + 'T00:00:00') : undefined)} className="mt-1 h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" id="to-date" className="w-full justify-between mt-1 h-11 font-normal">
+                      <span>{formatDateForDisplay(toDate)}</span>
+                      <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={toDate} onSelect={setToDate}
+                      disabled={(date) => date > new Date() || (fromDate ? date < fromDate : false)} initialFocus />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{visibleCount} saved transaction{visibleCount === 1 ? '' : 's'} in the selected period.</p>
