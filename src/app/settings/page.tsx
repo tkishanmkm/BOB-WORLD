@@ -934,7 +934,7 @@ export default function SettingsPage() {
             <CardDescription>Choose a section to expand it. Related fields and tools are kept together, and your existing save, import and export actions remain available.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <details className="rounded-xl border bg-card p-4 shadow-sm" open>
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" open>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Account Holder Details</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -996,7 +996,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+             <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Fund Transfer Security</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1020,7 +1020,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+             <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Statement Account & Branch Fields</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1049,7 +1049,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-             <details className="rounded-xl border bg-card p-4 shadow-sm" >
+             <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Statement PDF Management</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1098,7 +1098,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Application Images</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1139,7 +1139,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Master Account Balance</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1156,7 +1156,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Passbook Display Overrides</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1183,7 +1183,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Payees</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1235,7 +1235,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Transactions</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1298,7 +1298,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Statement Transaction Import</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
@@ -1334,7 +1334,7 @@ export default function SettingsPage() {
               </div>
             </details>
 
-            <details className="rounded-xl border bg-card p-4 shadow-sm" >
+            <details className="group rounded-xl border bg-card p-4 shadow-sm" >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                 <span>Live Agent Chat Messages</span>
                 <span aria-hidden="true" className="text-xl text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
