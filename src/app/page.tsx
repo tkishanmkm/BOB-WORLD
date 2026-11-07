@@ -13,7 +13,9 @@ import {
   LOGIN_BANNER_KEY_3,
   LOGIN_BANNER_KEY_4,
   LOGIN_BANNER_KEY_5,
+  LOGIN_MPIN_HASH_STORAGE_KEY,
 } from "@/lib/constants";
+import { verifyTpin } from '@/lib/tpin-security';
 import type { AccountDetailsType } from "@/lib/types";
 import {
   ChevronDown,
@@ -127,7 +129,7 @@ export default function LoginPage() {
     return () => window.clearInterval(sliderInterval);
   }, [loginBanners.length]);
 
-  const handlePinChange = (index: number, value: string) => {
+  const handlePinChange = async (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
 
     const nextPin = [...pin];
@@ -139,6 +141,20 @@ export default function LoginPage() {
     else if (!value && index > 0) inputRefs.current[index - 1]?.focus();
 
     if (nextPin.every((digit) => digit !== "") && nextPin.join("").length === 4) {
+      const verifier = localStorage.getItem(LOGIN_MPIN_HASH_STORAGE_KEY);
+      if (!verifier) {
+        setError("Login MPIN is not configured. Set your four-digit MPIN in Settings first.");
+        setPin(["", "", "", ""]);
+        inputRefs.current[0]?.focus();
+        return;
+      }
+      const isValidMpin = await verifyTpin(nextPin.join(""), verifier);
+      if (!isValidMpin) {
+        setError("Incorrect MPIN. Please try again.");
+        setPin(["", "", "", ""]);
+        inputRefs.current[0]?.focus();
+        return;
+      }
       const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
       let details: AccountDetailsType = { ...INITIAL_ACCOUNT_DETAILS };
       try {
@@ -266,7 +282,7 @@ export default function LoginPage() {
             <button
               type="button"
               aria-label="Use face ID"
-              onClick={() => setError("Face ID is not available on this device.")}
+              onClick={() => setError("Face ID is not enrolled for this app on this device. Enter your MPIN to log in.")}
               className="ml-1 flex h-[clamp(44px,6svh,54px)] w-[clamp(44px,6svh,54px)] shrink-0 items-center justify-center rounded-full bg-[#244d78] text-white shadow-sm"
             >
               <ScanFace className="h-7 w-7" />
