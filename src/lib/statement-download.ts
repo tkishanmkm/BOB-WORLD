@@ -108,29 +108,32 @@ export async function saveStatementPdf(
   return 'Downloads';
 }
 
-/** Saves one generated PDF (for example a transaction receipt). */
+/** Saves one PDF and uses the native iOS file share sheet when available. */
 export async function savePdfToDownloads(pdf: Blob, fileName: string): Promise<string> {
   const platform = Capacitor.getPlatform();
+  const safeFileName = fileName.toLowerCase().endsWith('.pdf') ? fileName : fileName + '.pdf';
+  const pdfOnly = pdf.type === 'application/pdf' ? pdf : new Blob([pdf], { type: 'application/pdf' });
   if (Capacitor.isNativePlatform()) {
-    const directory = Directory.Documents;
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Could not prepare the PDF for saving.'));
-      reader.onload = () => typeof reader.result === 'string'
-        ? resolve(reader.result)
-        : reject(new Error('Could not encode the PDF.'));
-      reader.readAsDataURL(pdf);
-    });
+    const dataUrl = await blobToDataUri(pdfOnly);
     await Filesystem.writeFile({
-      path: 'Downloads/' + fileName,
+      path: 'Downloads/' + safeFileName,
       data: dataUrl.split(',')[1],
-      directory,
+      directory: Directory.Documents,
       recursive: true,
     });
     return platform === 'android' ? 'Documents/Downloads' : 'Files > On My iPhone > BOB World > Downloads';
   }
-
-  const pdfOnly = pdf.type === 'application/pdf' ? pdf : new Blob([pdf], { type: 'application/pdf' });
-  triggerBrowserDownload(pdfOnly, fileName.toLowerCase().endsWith('.pdf') ? fileName : fileName + '.pdf');
+  const pdfFile = new File([pdfOnly], safeFileName, { type: 'application/pdf' });
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function' && navigator.canShare({ files: [pdfFile] })) {
+    try {
+      await navigator.share({ files: [pdfFile], title: 'PDF document' });
+      return 'iOS/browser share sheet (choose Save to Files)';
+    } catch (shareError) {
+      if (shareError instanceof Error && shareError.name === 'AbortError') return 'Share sheet closed without saving';
+      console.warn('PDF share sheet unavailable; using browser download:', shareError);
+    }
+  }
+  triggerBrowserDownload(pdfOnly, safeFileName);
   return 'Downloads';
 }
