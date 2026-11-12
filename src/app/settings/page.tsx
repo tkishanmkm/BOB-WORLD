@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect, type FormEvent, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,10 @@ import {
   OTP_NOTIFICATION_AVATAR_KEY,
   TPIN_HASH_STORAGE_KEY,
   LOGIN_MPIN_HASH_STORAGE_KEY,
+  SUPER_LOGOUT_STORAGE_KEY,
 } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText, ShieldCheck } from 'lucide-react';
+import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText, ShieldCheck, LogOut } from 'lucide-react';
 import { AddTransactionDialog } from "@/components/passbook/add-transaction-dialog";
 import { AddPayeeDialog } from "@/components/fund-transfer/add-payee-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
@@ -74,7 +76,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { format, parseISO } from 'date-fns';
-import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys, readAllAppState } from '@/lib/indexed-db';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, persistStorageKeys, readAllAppState, readAppState, writeAppState } from '@/lib/indexed-db';
 
 
 interface ImageUploaderState {
@@ -115,6 +117,7 @@ export default function SettingsPage() {
   const [loginMpin, setLoginMpin] = useState('');
   const [confirmLoginMpin, setConfirmLoginMpin] = useState('');
   const [isLoginMpinConfigured, setIsLoginMpinConfigured] = useState(false);
+  const [isSuperLogoutActive, setIsSuperLogoutActive] = useState(false);
   const [isSavingLoginMpin, setIsSavingLoginMpin] = useState(false);
 
   const [isPayeeDialogOpen, setIsPayeeDialogOpen] = useState(false);
@@ -141,6 +144,7 @@ export default function SettingsPage() {
 
 
   const { toast } = useToast();
+  const router = useRouter();
   const pdfFileInputRef = useRef<HTMLInputElement>(null);
   const statementPdfInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,11 +171,16 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(() => {
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(async () => {
+      const [storedLoginMpin, storedLogout] = await Promise.all([
+        readAppState<string>(LOGIN_MPIN_HASH_STORAGE_KEY),
+        readAppState<boolean>(SUPER_LOGOUT_STORAGE_KEY),
+      ]);
       if (cancelled) return;
       setIsClient(true);
       setIsTransferTpinConfigured(Boolean(localStorage.getItem(TPIN_HASH_STORAGE_KEY)));
-      setIsLoginMpinConfigured(Boolean(localStorage.getItem(LOGIN_MPIN_HASH_STORAGE_KEY)));
+      setIsLoginMpinConfigured(Boolean(storedLoginMpin));
+      setIsSuperLogoutActive(storedLogout === true);
     }).catch(error => console.error('Could not restore Settings state from IndexedDB:', error));
     return () => { cancelled = true; };
   }, []);
@@ -360,8 +369,7 @@ export default function SettingsPage() {
     setIsSavingLoginMpin(true);
     try {
       const verifier = await createTpinVerifier(loginMpin);
-      localStorage.setItem(LOGIN_MPIN_HASH_STORAGE_KEY, JSON.stringify(verifier));
-      await persistStorageKeys(BOB_WORLD_STATE_KEYS);
+      await writeAppState(LOGIN_MPIN_HASH_STORAGE_KEY, JSON.stringify(verifier));
       setIsLoginMpinConfigured(true);
       setLoginMpin('');
       setConfirmLoginMpin('');
@@ -371,6 +379,22 @@ export default function SettingsPage() {
       toast({ title: 'MPIN could not be saved', description: 'Secure local cryptography is unavailable on this device.', variant: 'destructive' });
     } finally {
       setIsSavingLoginMpin(false);
+    }
+  };
+
+  const handleStartSuperLogout = async () => {
+    try {
+      const verifier = await readAppState<string>(LOGIN_MPIN_HASH_STORAGE_KEY);
+      if (!verifier) {
+        toast({ title: 'Configure MPIN first', description: 'Set your four-digit Login MPIN in Login Security & MPIN before using Super Logout.', variant: 'destructive' });
+        return;
+      }
+      await writeAppState(SUPER_LOGOUT_STORAGE_KEY, true);
+      setIsSuperLogoutActive(true);
+      router.replace('/');
+    } catch (error) {
+      console.error('Could not start local Super Logout:', error);
+      toast({ title: 'Super Logout could not start', description: 'The device-local lock could not be saved in IndexedDB.', variant: 'destructive' });
     }
   };
 
@@ -959,6 +983,24 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 pb-8">
       <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+      <Card className="border-primary/20 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Super Logout</CardTitle>
+          <CardDescription>
+            Lock this app on this device. After the splash screen, complete the local app-code screens and enter your saved four-digit Login MPIN. The lock is kept directly in IndexedDB until MPIN verification succeeds.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className={cn("text-sm font-semibold", isSuperLogoutActive ? "text-amber-700" : "text-emerald-700")}>
+            {isSuperLogoutActive ? 'Super Logout is active on this device.' : 'App session is currently unlocked.'}
+          </p>
+          <Button type="button" variant="destructive" onClick={handleStartSuperLogout} disabled={!isLoginMpinConfigured || isSuperLogoutActive}>
+            <LogOut className="mr-2 h-4 w-4" />Super Logout
+          </Button>
+          {!isLoginMpinConfigured && <p className="text-xs text-muted-foreground">Configure a Login MPIN in the Login Security & MPIN section first.</p>}
+          <p className="text-xs text-muted-foreground">All verification is local to this app. No SMS or bank authentication service is contacted.</p>
+        </CardContent>
+      </Card>
       <form onSubmit={handleSaveChanges}>
         <Card className="shadow-lg">
           <CardHeader>
