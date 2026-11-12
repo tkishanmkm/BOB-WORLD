@@ -1,7 +1,7 @@
 
 "use client"; // Required for usePathname and useEffect/useState
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -10,8 +10,7 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { SplashScreen } from '@/components/layout/splash-screen'; // Import SplashScreen
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage, readAppState } from '@/lib/indexed-db';
-import { SUPER_LOGOUT_STORAGE_KEY } from '@/lib/constants';
+import { BOB_WORLD_STATE_KEYS, migrateLegacyStorage } from '@/lib/indexed-db';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,51 +28,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [showSplash, setShowSplash] = useState(true);
-  const [logoutGuardReady, setLogoutGuardReady] = useState(false);
-  const [superLogoutActive, setSuperLogoutActive] = useState(false);
-  const showAppShell = logoutGuardReady && !superLogoutActive && !showSplash && pathname !== '/';
+  const [showSplash, setShowSplash] = useState(pathname === '/');
+  // showAppShell should be true if not on splash screen AND not on the login page ('/')
+  const showAppShell = !showSplash && pathname !== '/';
 
   useEffect(() => {
-    let cancelled = false;
-    let splashTimer: number | undefined;
-    setLogoutGuardReady(false);
-    setShowSplash(true);
-
-    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).then(async () => {
-      const lockActive = (await readAppState<boolean>(SUPER_LOGOUT_STORAGE_KEY)) === true;
-      if (cancelled) return;
-      setSuperLogoutActive(lockActive);
-      setLogoutGuardReady(true);
-
-      if (lockActive && pathname !== '/') {
-        router.replace('/');
-        return;
-      }
-
-      if (pathname === '/') {
-        splashTimer = window.setTimeout(() => setShowSplash(false), 4000);
-      } else {
+    const isLoginPage = pathname === '/';
+    if (isLoginPage) {
+      setShowSplash(true);
+      const timer = setTimeout(() => {
         setShowSplash(false);
-      }
-    }).catch(error => {
-      console.error('Could not initialise the local access lock:', error);
-      if (cancelled) return;
-      setSuperLogoutActive(true);
-      setLogoutGuardReady(true);
-      if (pathname !== '/') {
-        router.replace('/');
-      } else {
-        splashTimer = window.setTimeout(() => setShowSplash(false), 4000);
-      }
-    });
+      }, 4000); // Show splash for 4 seconds
+      return () => clearTimeout(timer); // Cleanup timer
+    } else {
+      setShowSplash(false);
+    }
+  }, [pathname]);
 
-    return () => {
-      cancelled = true;
-      if (splashTimer !== undefined) window.clearTimeout(splashTimer);
-    };
-  }, [pathname, router]);
+  useEffect(() => {
+    void migrateLegacyStorage(BOB_WORLD_STATE_KEYS).catch(error => {
+      console.error('Could not initialise local IndexedDB storage:', error);
+    });
+  }, []);
 
   useEffect(() => {
     document.title = 'BOB World - Your Financial Hub';
@@ -105,7 +81,7 @@ export default function RootLayout({
     setHeadLink('manifest', '/site.webmanifest');
   }, []);
 
-  if (!logoutGuardReady || showSplash || (superLogoutActive && pathname !== '/')) {
+  if (showSplash) {
     return (
       <html lang="en" suppressHydrationWarning>
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-background`}>

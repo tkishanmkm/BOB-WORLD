@@ -159,7 +159,6 @@ export const PASSBOOK_TOTAL_OUT_KEY = 'bobworld_passbook_total_out';
 export const PASSBOOK_CLOSING_BALANCE_KEY = 'bobworld_passbook_closing_balance';
 export const TPIN_HASH_STORAGE_KEY = 'bobworld_transfer_tpin_verifier';
 export const LOGIN_MPIN_HASH_STORAGE_KEY = 'bobworld_login_mpin_verifier';
-export const SUPER_LOGOUT_STORAGE_KEY = 'bobworld_super_logout_active';
 export const STATEMENT_PDF_KEY = 'bobworld_statement_pdf';
 export const STATEMENT_LOGO_KEY = 'bobworld_statement_logo';
 export const STATEMENT_BANK_LOGO_KEY = 'bobworld_statement_bank_logo';
