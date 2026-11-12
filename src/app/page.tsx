@@ -343,9 +343,9 @@ export default function LoginPage() {
             style={{ transform: notificationVisible ? "translate(-50%, 0)" : "translate(-50%, -125%)", opacity: notificationVisible ? 1 : 0 }}
           >
             <div className="flex min-h-[68px] items-center gap-3 px-3 py-2">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/15">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden bg-transparent">
                 {otpNotificationAvatar
-                  ? <img src={otpNotificationAvatar} alt="" className="h-11 w-11 rounded-full object-cover" />
+                  ? <img src={otpNotificationAvatar} alt="" className="h-11 w-11 object-contain" />
                   : <svg viewBox="0 0 44 44" aria-hidden="true" className="h-11 w-11"><circle cx="22" cy="22" r="22" fill="#d1d5db" /><circle cx="22" cy="15" r="7" fill="#fff" /><path d="M7 38c1-8 7-13 15-13s14 5 15 13" fill="#fff" /></svg>}
               </div>
               <div className="min-w-0 flex-1">
