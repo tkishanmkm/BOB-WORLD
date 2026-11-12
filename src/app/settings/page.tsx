@@ -37,6 +37,7 @@ import {
   OTP_NOTIFICATION_AVATAR_KEY,
   TPIN_HASH_STORAGE_KEY,
   LOGIN_MPIN_HASH_STORAGE_KEY,
+  SUPER_LOGOUT_STORAGE_KEY,
 } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { Save, UserCircle2, IndianRupee, ListPlus, Trash2, PlusCircle, Edit3, BookOpen, Image as ImageIconLucide, CalendarClock, Briefcase, Building, Mail, Phone, CalendarDays, CreditCardIcon, UploadCloud, XCircle, FileUp, Loader2, Users, UserPlus, MessageSquare, FileText, ShieldCheck } from 'lucide-react';
@@ -346,6 +347,11 @@ export default function SettingsPage() {
 
   const handleDetailsChange = (field: keyof AccountDetailsType, value: string) => {
     setAccountDetails(prev => ({ ...prev, [field]: value }));
+  };
+
+  const startSuperLogout = () => {
+    localStorage.setItem(SUPER_LOGOUT_STORAGE_KEY, "1");
+    window.location.assign("/");
   };
 
   const handleSaveLoginMpin = async () => {
@@ -992,6 +998,9 @@ export default function SettingsPage() {
                     {isSavingLoginMpin ? 'Saving MPIN...' : isLoginMpinConfigured ? 'Update Login MPIN' : 'Set Login MPIN'}
                   </Button>
                   <p className="mt-2 text-xs text-muted-foreground">Face ID is not enabled unless biometric enrolment is completed. Use MPIN when Face ID is unavailable.</p>
+                  <Button type="button" variant="outline" className="mt-4 w-full sm:w-auto" onClick={startSuperLogout}>
+                    <ShieldCheck className="mr-2 h-4 w-4" />Super Logout
+                  </Button>
                 </div>
               </div>
             </details>
